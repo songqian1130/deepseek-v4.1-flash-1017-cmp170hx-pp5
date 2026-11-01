@@ -1,0 +1,33 @@
+diff --git a/vllm/v1/worker/gpu/spec_decode/dspark/utils.py b/vllm/v1/worker/gpu/spec_decode/dspark/utils.py
+--- a/vllm/v1/worker/gpu/spec_decode/dspark/utils.py
++++ b/vllm/v1/worker/gpu/spec_decode/dspark/utils.py
+@@ -1,9 +1,10 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ import torch.nn as nn
+ 
+ from vllm.config import ModelConfig, VllmConfig, replace
+ from vllm.logger import init_logger
++import os
+ from vllm.model_executor.offloader import create_offloader, set_offloader
+ from vllm.v1.attention.backends.registry import AttentionBackendEnum
+@@ -78,10 +78,21 @@
+     # config is retained for DSpark's target-layer metadata, so we must override it.
+     draft_vllm_config.quant_config = get_draft_quant_config(vllm_config)
+ 
++    # Permit DSpark-only UVA offload while leaving the target model's
++    # offload_config untouched. This is intentionally opt-in.
++    dspark_cpu_gb = float(os.environ.get("VLLM_DSPARK_CPU_OFFLOAD_GB", "0"))
++    if dspark_cpu_gb > 0:
++        draft_vllm_config.offload_config = replace(
++            draft_vllm_config.offload_config,
++            offload_backend="uva",
++            uva=replace(
++                draft_vllm_config.offload_config.uva,
++                cpu_offload_gb=dspark_cpu_gb,
++                cpu_offload_params=set(),
++            ),
++        )
++
+     # The target model has already consumed the process-global offloader budget.

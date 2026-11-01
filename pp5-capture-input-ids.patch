@@ -1,0 +1,22 @@
+diff --git a/vllm/v1/worker/gpu/cudagraph_utils.py b/vllm/v1/worker/gpu/cudagraph_utils.py
+--- a/vllm/v1/worker/gpu/cudagraph_utils.py
++++ b/vllm/v1/worker/gpu/cudagraph_utils.py
+@@ -607,7 +607,17 @@
+             }
+             if not self.is_first_pp_rank:
+                 # Update for non-first PP ranks.
+-                model_inputs["input_ids"] = None
++                # DeepSeek V4.1 needs token IDs for vision/hash MoE routing
++                # on every PP stage, including the eager pre-capture warmup.
++                # Keep the same dummy ID buffer already used by rank 0.
++                if (
++                    getattr(
++                        self.vllm_config.model_config.hf_config,
++                        "model_type",
++                        None,
++                    ) != "deepseek_v41"
++                ):
++                    model_inputs["input_ids"] = None
+                 model_inputs["inputs_embeds"] = None
+                 assert intermediate_tensors is not None
+                 model_inputs["intermediate_tensors"] = intermediate_tensors[:num_tokens]

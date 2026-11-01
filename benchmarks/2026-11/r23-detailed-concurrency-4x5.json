@@ -1,0 +1,473 @@
+{
+  "benchmark": "synchronized-4-concurrent-streaming-requests",
+  "base": "http://127.0.0.1:9027/v1",
+  "model": "deepseek-v4.1-flash-1017",
+  "concurrency": 4,
+  "rounds": [
+    {
+      "round": 1,
+      "requests": [
+        {
+          "prompt": "用中文解释为什么昼夜交替发生，并给出一个生活中的例子。",
+          "text": "我们需要回答中文解释昼夜交替发生原因，并给生活例子。需要简洁准确。昼夜交替因为地球自转，地球是不透明球体，太阳光只能照亮一半，自转使各地轮流进入光照和背光。例子：白天黑夜轮换，比如早上太阳升起上学，晚上回家睡觉；或地球仪手电筒实验。需要中文。注意“昼夜交替”不是公转。可提周期约24小时。生活例子：从窗户看太阳东升西落，白天变黑夜。回答。昼夜交替是因为地球在不停地自转。地球是一个不透明的球体，太阳光同一时间只能照亮地球的一半：被照亮的一面是白天，背对太阳的一面是黑夜。地球自转使不同地区轮流朝向太阳，所以同一个地方会经历白天和黑夜的交替，周期大约是一天（24小时）。\n\n生活中的例子：早上太阳升起后，我们起床、上学或上班",
+          "ttft_s": 2.398334736994002,
+          "decode_s": 12.882507328002248,
+          "completion_tokens": 192,
+          "decode_tok_s": 14.903930974885334,
+          "usage": {
+            "prompt_tokens": 44,
+            "total_tokens": 236,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 110
+            }
+          }
+        },
+        {
+          "prompt": "Explain in English how a hash table provides average constant-time lookup, including one caveat.",
+          "text": "We need answer explain hash table average O(1) lookup incl caveat. Need concise. Explain hash function maps key to bucket, array indexing, collisions handled chaining/open addressing. Average constant if hash uniform and load factor bounded. Caveat worst-case O(n) due collisions/adversarial keys, resizing, poor hash. Need mention average not guaranteed. English. Desired oververbosity 5. Provide clear.A hash table gives **average constant-time lookup, O(1)**, by using a **hash function** to turn a key into an integer index into an array of buckets:\n\n1. Compute `index = hash(key) % number_of_buckets`.\n2. Go directly to that bucket.\n3. If the bucket contains the key, return its value; if collisions are handled by chaining, scan the small chain; if by open addressing, probe according to the collision-resolution scheme.\n\nBecause the hash function spreads keys",
+          "ttft_s": 2.397052963002352,
+          "decode_s": 12.883103146014037,
+          "completion_tokens": 192,
+          "decode_tok_s": 14.903241697587726,
+          "usage": {
+            "prompt_tokens": 48,
+            "total_tokens": 240,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 86
+            }
+          }
+        },
+        {
+          "prompt": "Write a Python function named clamp that takes x, low, and high and returns x limited to that inclusive range. Include only the function and a short comment.",
+          "text": "We need answer only function and short comment. Need ensure inclusive range. If low > high? Usually clamp assumes low <= high. Could handle? \"limited to that inclusive range\" likely min(max(x, low), high). Include only function and short comment. Need Python. Maybe comment docstring? \"short comment\". We can provide code block. Only function and short comment. No extra. Ensure function named clamp. Could use max(low, min(x, high))? If low<=high. min(max(x, low), high) works. If low>high returns high? Actually max(x,low)>=low then min(...,high)=high if high<low. But range invalid. Fine.\n\nNeed include only function and short comment. Maybe:\n\ndef clamp(x, low, high):\n    # Limit x to the inclusive range [low, high].\n    return min(max(x, low), high)\n\nThat's it.```python",
+          "ttft_s": 2.397344136988977,
+          "decode_s": 12.882927814993309,
+          "completion_tokens": 192,
+          "decode_tok_s": 14.90344452419799,
+          "usage": {
+            "prompt_tokens": 62,
+            "total_tokens": 254,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 189
+            }
+          }
+        },
+        {
+          "prompt": "Explain why Earth has seasons and give one example of how seasons affect daily life.",
+          "text": "We need answer. Need explain seasons: axial tilt 23.5, orbit, sunlight angle/duration, not distance. Example daily life: clothing, heating, agriculture, daylight savings, school calendar. Need concise. Ensure one example. Final.Earth has seasons mainly because its axis is tilted about 23.5° relative to its orbit around the Sun. As Earth orbits, different hemispheres receive sunlight at different angles and for different lengths of time. When a hemisphere is tilted toward the Sun, it gets more direct sunlight and longer days—summer. When tilted away, it gets less direct sunlight and shorter days—winter. Earth’s changing distance from the Sun is not the main cause of seasons.\n\nExample: In many places, people change their daily clothing and home heating/cooling routines with the seasons—wearing coats and heating homes in winter, and wearing lighter clothes and using fans or air conditioning in summer.",
+          "ttft_s": 1.7188332359946799,
+          "decode_s": 12.973673164000502,
+          "completion_tokens": 190,
+          "decode_tok_s": 14.64504289557827,
+          "usage": {
+            "prompt_tokens": 46,
+            "total_tokens": 236,
+            "completion_tokens": 190,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 50
+            }
+          }
+        }
+      ],
+      "request_count": 4,
+      "completion_tokens": 766,
+      "batch_wall_s": 15.281725519016618,
+      "aggregate_decode_window_s": 13.562892283021938,
+      "aggregate_end_to_end_tok_s": 50.125229578740154,
+      "aggregate_decode_tok_s": 56.477629108570056,
+      "mean_ttft_s": 2.2278912682450027,
+      "mean_per_request_decode_tok_s": 14.83891502306233
+    },
+    {
+      "round": 2,
+      "requests": [
+        {
+          "prompt": "用中文解释为什么昼夜交替发生，并给出一个生活中的例子。",
+          "text": "我们需要回答中文。需要解释昼夜交替发生原因，并给生活例子。要简洁。需要可能提到地球自转，不透明球体，太阳光平行，地球绕地轴自转，朝向太阳半球昼，背向夜，交替。生活例子：白天上学晚上睡觉；或旋转地球仪手电筒。需要中文。注意“昼夜交替”不是公转造成，是自转。可给例子：坐旋转木马？更贴切：用手电筒照旋转的地球仪，某地一会儿亮一会儿暗。生活例子：白天在操场活动，晚上回家开灯睡觉。需要解释清楚。最终回答。昼夜交替主要是因为**地球自转**。地球是一个不透明的球体，太阳光只能照亮地球朝向太阳的一半：被照亮的一半是白天，背对太阳的一半是黑夜。地球绕着自己的地轴不停旋转，大约每24小时转一圈，所以同一个",
+          "ttft_s": 0.7838299499999266,
+          "decode_s": 8.923723801010055,
+          "completion_tokens": 192,
+          "decode_tok_s": 21.515681601246776,
+          "usage": {
+            "prompt_tokens": 44,
+            "total_tokens": 236,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 136
+            }
+          }
+        },
+        {
+          "prompt": "Explain in English how a hash table provides average constant-time lookup, including one caveat.",
+          "text": "We need answer explain hash table average O(1) lookup incl caveat. Need concise. Explain hashing key to bucket index, array access, collisions handled, average constant if good hash and load factor. Caveat worst-case O(n) due collisions/adversarial keys, resizing. Need English. Maybe mention expected under uniform hashing. One caveat. Final.A hash table gives average constant-time lookup by using a hash function to turn a key into an index into an array of buckets. For a lookup, it computes the key’s hash, goes directly to that bucket, and then checks only the entries in that bucket (usually a small number). If the hash function spreads keys evenly and the table is kept at a reasonable load factor, the expected number of entries per bucket is O(1), so lookup is average O(1).\n\nCaveat: this is only average/expected time. If many keys collide—because",
+          "ttft_s": 0.7833823949913494,
+          "decode_s": 8.924101391981822,
+          "completion_tokens": 192,
+          "decode_tok_s": 21.514771243243523,
+          "usage": {
+            "prompt_tokens": 48,
+            "total_tokens": 240,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 76
+            }
+          }
+        },
+        {
+          "prompt": "Write a Python function named clamp that takes x, low, and high and returns x limited to that inclusive range. Include only the function and a short comment.",
+          "text": "We need answer only function and short comment. Need ensure inclusive range. If low > high? Not specified. Standard clamp: return max(low, min(x, high)) assumes low<=high. Could handle? \"limited to that inclusive range\" likely low<=high. Include only function and short comment. Need Python. Maybe:\n\ndef clamp(x, low, high):\n    # Limit x to the inclusive range [low, high].\n    return max(low, min(x, high))\n\nNeed only function and short comment. Final.def clamp(x, low, high):\n    # Limit x to the inclusive range [low, high].\n    return max(low, min(x, high))",
+          "ttft_s": 0.7840215460164472,
+          "decode_s": 6.4518816479831,
+          "completion_tokens": 142,
+          "decode_tok_s": 22.009083202012874,
+          "usage": {
+            "prompt_tokens": 62,
+            "total_tokens": 204,
+            "completion_tokens": 142,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 108
+            }
+          }
+        },
+        {
+          "prompt": "Explain why Earth has seasons and give one example of how seasons affect daily life.",
+          "text": "We need answer. Need explain seasons: axial tilt 23.5, orbit, sunlight angle/day length, not distance. Example daily life: clothing, heating, agriculture, daylight saving? Need concise. Ensure one example. Final.Earth has seasons mainly because its axis is tilted about 23.5° relative to its orbit around the Sun. As Earth orbits, different hemispheres receive sunlight at different angles and for different lengths of time. When a hemisphere is tilted toward the Sun, it gets more direct sunlight and longer days—summer; when tilted away, it gets less direct sunlight and shorter days—winter. Earth’s changing distance from the Sun is not the main cause of seasons.\n\nExample: In many places, people change their daily clothing and home heating/cooling routines with the seasons—wearing coats and heating homes in winter, and wearing lighter clothes and using fans or air conditioning in summer.",
+          "ttft_s": 0.7840705250273459,
+          "decode_s": 8.660189774993341,
+          "completion_tokens": 187,
+          "decode_tok_s": 21.593060297589584,
+          "usage": {
+            "prompt_tokens": 46,
+            "total_tokens": 233,
+            "completion_tokens": 187,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 47
+            }
+          }
+        }
+      ],
+      "request_count": 4,
+      "completion_tokens": 713,
+      "batch_wall_s": 9.708131609018892,
+      "aggregate_decode_window_s": 8.924310823000269,
+      "aggregate_end_to_end_tok_s": 73.44358613119957,
+      "aggregate_decode_tok_s": 79.89412450341976,
+      "mean_ttft_s": 0.7838261040087673,
+      "mean_per_request_decode_tok_s": 21.65814908602319
+    },
+    {
+      "round": 3,
+      "requests": [
+        {
+          "prompt": "用中文解释为什么昼夜交替发生，并给出一个生活中的例子。",
+          "text": "我们需要回答中文。需要解释昼夜交替发生原因，并给生活例子。要简洁。需要可能提到地球自转，不透明球体，太阳光照射一半，地球自转使各地轮流进入光照和背光。例子：白天黑夜，比如中国早上太阳升起，美国那边夜晚？生活例子：地球仪手电筒？或者日常：早上太阳升起天亮，傍晚落下天黑；因为地球自转。需要中文。注意“昼夜交替”不是公转。可给例子：坐旋转木马/旋转椅子面对灯，转到面向灯亮，背对灯暗。生活例子：我们每天看到太阳东升西落，其实是地球自西向东自转造成。回答。昼夜交替是因为地球是一个不透明的球体，太阳只能照亮地球的一半；同时地球在不停地自转。被太阳照到的一面是白天，背对太阳的一面是黑夜。地球自转使不同",
+          "ttft_s": 0.680889227980515,
+          "decode_s": 8.055953269009478,
+          "completion_tokens": 192,
+          "decode_tok_s": 23.833306076713054,
+          "usage": {
+            "prompt_tokens": 44,
+            "total_tokens": 236,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 148
+            }
+          }
+        },
+        {
+          "prompt": "Explain in English how a hash table provides average constant-time lookup, including one caveat.",
+          "text": "We need answer explain hash table average O(1) lookup caveat. Need concise. Explain hashing key to bucket index, array access, collisions handled chaining/open addressing, average constant if hash uniform and load factor bounded. Caveat worst-case O(n) due collisions/adversarial keys, resizing, poor hash. Need English. Desired oververbosity 5. Provide maybe formula. Ensure \"average constant-time lookup including one caveat.\" Could mention amortized resizing. One caveat: worst-case can degrade to O(n) if many collisions. Let's craft.A hash table gives **average O(1) lookup** by turning a key into an array index using a **hash function**:\n\n1. Compute `h = hash(key)`.\n2. Map `h` to a bucket index, e.g. `h % capacity`.\n3. Go directly to that bucket in an array.\n4. If the bucket",
+          "ttft_s": 0.6802543140074704,
+          "decode_s": 8.055984567996347,
+          "completion_tokens": 192,
+          "decode_tok_s": 23.833213479920243,
+          "usage": {
+            "prompt_tokens": 48,
+            "total_tokens": 240,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 119
+            }
+          }
+        },
+        {
+          "prompt": "Write a Python function named clamp that takes x, low, and high and returns x limited to that inclusive range. Include only the function and a short comment.",
+          "text": "We need answer only function and short comment. Need ensure inclusive range. If low > high? Usually clamp assumes low <= high. Could handle? \"limited to that inclusive range\" likely min(max(x, low), high). Include only function and short comment. Need no extra.```python\ndef clamp(x, low, high):\n    # Return x limited to the inclusive range [low, high]\n    return max(low, min(x, high))\n```",
+          "ttft_s": 0.6805771850049496,
+          "decode_s": 3.8064262560219504,
+          "completion_tokens": 95,
+          "decode_tok_s": 24.95779337632127,
+          "usage": {
+            "prompt_tokens": 62,
+            "total_tokens": 157,
+            "completion_tokens": 95,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 56
+            }
+          }
+        },
+        {
+          "prompt": "Explain why Earth has seasons and give one example of how seasons affect daily life.",
+          "text": "We need answer. Need explain seasons: axial tilt 23.5, orbit, sunlight angle/duration, not distance. Example daily life: clothing, heating, agriculture, daylight saving? Need concise. Ensure one example. Maybe mention hemispheres opposite. Final.Earth has seasons mainly because its axis is tilted about 23.5° relative to its orbit around the Sun. As Earth orbits, different parts of the planet receive sunlight at different angles and for different lengths of time. When a hemisphere is tilted toward the Sun, it gets more direct sunlight and longer days—summer. When tilted away, it gets less direct sunlight and shorter days—winter. Earth’s changing distance from the Sun is not the main cause of seasons.\n\nExample: In many places, people change their daily clothing and home heating/cooling routines with the seasons—wearing coats and heating homes in winter, and wearing lighter clothes and using fans or air conditioning in",
+          "ttft_s": 0.6812479229993187,
+          "decode_s": 8.056419777014526,
+          "completion_tokens": 192,
+          "decode_tok_s": 23.83192600611355,
+          "usage": {
+            "prompt_tokens": 46,
+            "total_tokens": 238,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 52
+            }
+          }
+        }
+      ],
+      "request_count": 4,
+      "completion_tokens": 671,
+      "batch_wall_s": 8.737667700013844,
+      "aggregate_decode_window_s": 8.056768931011902,
+      "aggregate_end_to_end_tok_s": 76.79394811488847,
+      "aggregate_decode_tok_s": 83.28400699406986,
+      "mean_ttft_s": 0.6807421624980634,
+      "mean_per_request_decode_tok_s": 24.11405973476703
+    },
+    {
+      "round": 4,
+      "requests": [
+        {
+          "prompt": "用中文解释为什么昼夜交替发生，并给出一个生活中的例子。",
+          "text": "我们需要回答中文解释昼夜交替发生原因，并给生活例子。需要简洁。原因：地球自转，地球是不透明球体，太阳光只能照亮一半，自转使各地轮流进入光照和背光。例子：白天黑夜，比如早上太阳升起上学，晚上回家开灯；或地球仪手电筒实验。需要中文。注意“昼夜交替发生”解释。可提周期约24小时。生活例子：从窗户看太阳位置变化，早晨亮，傍晚暗。回答要清楚。最终。昼夜交替是因为地球是一个不透明球体，并且不停自转。太阳光同一时间只能照亮地球的一半：被照亮的一面是白天，背光的一面是黑夜。地球自转使各地轮流进入光照区和背光区，所以同一地方会经历白天—黑夜—白天的循环，周期约24小时。\n\n生活中的例子：早上太阳升起后房间变亮，我们起床去",
+          "ttft_s": 0.5835695840069093,
+          "decode_s": 7.972547869983828,
+          "completion_tokens": 192,
+          "decode_tok_s": 24.082639970450185,
+          "usage": {
+            "prompt_tokens": 44,
+            "total_tokens": 236,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 110
+            }
+          }
+        },
+        {
+          "prompt": "Explain in English how a hash table provides average constant-time lookup, including one caveat.",
+          "text": "We need answer explain hash table average O(1) lookup caveat. Need concise. Explain hashing key to bucket index, array access, collisions handled, average constant if good hash and load factor. Caveat worst-case O(n) due collisions/adversarial keys, resizing, etc. Need English. Maybe mention amortized. Desired oververbosity 5. Provide clear.A hash table gives **average constant-time lookup** by turning a key into an array index using a **hash function**:\n\n1. Compute `hash(key)`.\n2. Map that hash to a bucket index, e.g. `hash(key) % num_buckets`.\n3. Go directly to that bucket in an array and check for the key.\n\nBecause array indexing is O(1), if the hash function spreads keys evenly and the table is not too full, each bucket contains only a small number of entries—ideally one—so lookup takes",
+          "ttft_s": 0.9637317699962296,
+          "decode_s": 7.639199708995875,
+          "completion_tokens": 192,
+          "decode_tok_s": 25.1335227921718,
+          "usage": {
+            "prompt_tokens": 48,
+            "total_tokens": 240,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 79
+            }
+          }
+        },
+        {
+          "prompt": "Write a Python function named clamp that takes x, low, and high and returns x limited to that inclusive range. Include only the function and a short comment.",
+          "text": "We need answer only function and short comment. Need ensure inclusive range. If low > high? Not specified. Standard clamp: return max(low, min(x, high)) assumes low<=high. Could handle? \"limited to that inclusive range\" likely low<=high. Include only function and short comment. Need Python. Maybe:\n\ndef clamp(x, low, high):\n    # Limit x to the inclusive range [low, high].\n    return max(low, min(x, high))\n\nNeed only function and short comment. final.def clamp(x, low, high):\n    # Limit x to the inclusive range [low, high].\n    return max(low, min(x, high))",
+          "ttft_s": 0.9631582000001799,
+          "decode_s": 5.208339443983277,
+          "completion_tokens": 142,
+          "decode_tok_s": 27.263968012691596,
+          "usage": {
+            "prompt_tokens": 62,
+            "total_tokens": 204,
+            "completion_tokens": 142,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 108
+            }
+          }
+        },
+        {
+          "prompt": "Explain why Earth has seasons and give one example of how seasons affect daily life.",
+          "text": "We need answer. Need explain seasons: axial tilt 23.5, revolution, sunlight angle/duration, not distance. Example daily life: clothing, heating, agriculture, daylight saving? Need concise. Ensure one example. Final.Earth has seasons mainly because its axis is tilted about 23.5° relative to its orbit around the Sun. As Earth revolves, different hemispheres receive sunlight at different angles and for different lengths of time. When a hemisphere is tilted toward the Sun, it gets more direct sunlight and longer days—summer; when tilted away, it gets less direct sunlight and shorter days—winter. Earth’s changing distance from the Sun is not the main cause of seasons.\n\nExample: In winter, people often wear heavier clothing and use more heating because days are shorter and temperatures are colder.",
+          "ttft_s": 0.5840582110104151,
+          "decode_s": 6.86096179598826,
+          "completion_tokens": 166,
+          "decode_tok_s": 24.194858525092428,
+          "usage": {
+            "prompt_tokens": 46,
+            "total_tokens": 212,
+            "completion_tokens": 166,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 47
+            }
+          }
+        }
+      ],
+      "request_count": 4,
+      "completion_tokens": 692,
+      "batch_wall_s": 8.60343851201469,
+      "aggregate_decode_window_s": 8.019602379994467,
+      "aggregate_end_to_end_tok_s": 80.43295701289931,
+      "aggregate_decode_tok_s": 86.28856733922979,
+      "mean_ttft_s": 0.7736294412534335,
+      "mean_per_request_decode_tok_s": 25.168747325101503
+    },
+    {
+      "round": 5,
+      "requests": [
+        {
+          "prompt": "用中文解释为什么昼夜交替发生，并给出一个生活中的例子。",
+          "text": "我们需要回答中文解释昼夜交替发生原因，并给生活例子。需要简洁准确。昼夜交替因为地球自转，地球是不透明球体，太阳光只能照亮一半，自转使各地轮流进入光照和背光。例子：白天黑夜轮换，比如早上太阳升起上学，晚上天黑睡觉；或旋转地球仪手电筒。需要中文。注意“昼夜交替”不是公转。给生活例子。可提周期约24小时。回答。昼夜交替是因为地球在不停地自转。地球是一个不透明的球体，太阳光同一时间只能照亮地球的一半：被照亮的一面是白天，背对太阳的一面是黑夜。地球自转使不同地区轮流朝向太阳，于是白天和黑夜不断交替，大约每24小时循环一次。\n\n生活中的例子：我们早上看到太阳升起、白天上学活动，傍晚太阳落下后天逐渐变黑，晚上睡觉；第二天又天亮，这就是昼夜交替",
+          "ttft_s": 0.6843428080028389,
+          "decode_s": 7.618996520002838,
+          "completion_tokens": 192,
+          "decode_tok_s": 25.20016901122413,
+          "usage": {
+            "prompt_tokens": 44,
+            "total_tokens": 236,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 98
+            }
+          }
+        },
+        {
+          "prompt": "Explain in English how a hash table provides average constant-time lookup, including one caveat.",
+          "text": "We need answer explain hash table average O(1) lookup incl caveat. Need concise. Explain hashing key to bucket index, array access, collisions handled, average constant if good hash and load factor. Caveat worst-case O(n) due collisions/adversarial keys, resizing. Need English. Maybe mention expected under uniform hashing. One caveat. Final.A hash table gives average **O(1)** lookup by turning a key into an array index using a **hash function**. The table stores entries in “buckets” at that index, so lookup usually means: compute the hash, go directly to the bucket, and check the entry there—constant work on average.\n\nCollisions (two keys mapping to the same bucket) are handled by chaining or open addressing. As long as the hash function distributes keys well and the **load factor** is kept reasonable (often by resizing), the average number of entries",
+          "ttft_s": 0.68377384901396,
+          "decode_s": 7.61953093597549,
+          "completion_tokens": 192,
+          "decode_tok_s": 25.198401530660522,
+          "usage": {
+            "prompt_tokens": 48,
+            "total_tokens": 240,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 76
+            }
+          }
+        },
+        {
+          "prompt": "Write a Python function named clamp that takes x, low, and high and returns x limited to that inclusive range. Include only the function and a short comment.",
+          "text": "We need answer only function and short comment. Need ensure inclusive range. If low > high? Usually clamp assumes low <= high. Could handle? \"limited to that inclusive range\" likely min(max(x, low), high). Include only function and short comment. Need Python. Maybe comment docstring? \"short comment\". We can provide code block. Only function and short comment. No extra. Ensure function named clamp. Could use max(low, min(x, high))? If low<=high. min(max(x, low), high) works. If low>high returns high? Actually max(x,low)>=low then min(...,high)=high. But range invalid. Fine.\n\nNeed include only function and short comment. Maybe:\n\ndef clamp(x, low, high):\n    # Limit x to the inclusive range [low, high].\n    return max(low, min(x, high))\n\nThis is concise. But if x high? min",
+          "ttft_s": 0.683808397006942,
+          "decode_s": 7.619135315006133,
+          "completion_tokens": 192,
+          "decode_tok_s": 25.19970994895573,
+          "usage": {
+            "prompt_tokens": 62,
+            "total_tokens": 254,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 192
+            }
+          }
+        },
+        {
+          "prompt": "Explain why Earth has seasons and give one example of how seasons affect daily life.",
+          "text": "We need answer. Need explain seasons: axial tilt 23.5, orbit, sunlight angle/duration, not distance. Example daily life: clothing, heating, agriculture, daylight saving? Need concise. Ensure one example. Maybe mention hemispheres opposite. Final.Earth has seasons mainly because its axis is tilted about 23.5° relative to its orbit around the Sun. As Earth orbits, different parts of the planet receive sunlight at different angles and for different lengths of time. When a hemisphere is tilted toward the Sun, it gets more direct sunlight and longer days—summer. When tilted away, it gets less direct sunlight and shorter days—winter. Earth’s changing distance from the Sun is not the main cause of seasons.\n\nExample: In many places, people change their daily clothing and home heating/cooling routines with the seasons—wearing coats and heating homes in winter, and wearing lighter clothes and using fans or air conditioning in",
+          "ttft_s": 0.6847983630141243,
+          "decode_s": 7.619337605981855,
+          "completion_tokens": 192,
+          "decode_tok_s": 25.199040904718935,
+          "usage": {
+            "prompt_tokens": 46,
+            "total_tokens": 238,
+            "completion_tokens": 192,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "created_cache_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 52
+            }
+          }
+        }
+      ],
+      "request_count": 4,
+      "completion_tokens": 768,
+      "batch_wall_s": 8.304135968995979,
+      "aggregate_decode_window_s": 7.619961413991405,
+      "aggregate_end_to_end_tok_s": 92.48403480715838,
+      "aggregate_decode_tok_s": 100.78791194268196,
+      "mean_ttft_s": 0.6841808542594663,
+      "mean_per_request_decode_tok_s": 25.19933034888983
+    }
+  ]
+}

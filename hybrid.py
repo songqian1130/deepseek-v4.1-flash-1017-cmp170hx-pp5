@@ -1,0 +1,290 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+"""Scoped defaults and memory planning for CPU hybrid serving."""
+
+import math
+from pathlib import Path
+
+from vllm.logger import init_logger
+
+logger = init_logger(__name__)
+GiB = 1024**3
+
+
+def hybrid_settings(config):
+    extra = config.additional_config
+    return extra.get("deepseek_v41_hybrid") if isinstance(extra, dict) else None
+
+
+def apply_hybrid_defaults(args):
+    settings = hybrid_settings(args)
+    if settings is None or getattr(args, "_dsv41_hybrid_defaults", False):
+        return
+    if not isinstance(settings, dict):
+        raise ValueError("deepseek_v41_hybrid must be an object")
+    unknown = set(settings) - {
+        "pipeline_layers",
+        "cpu_expert_start_layer",
+        "cpu_expert_end_layer",
+        "ced_prefill",
+        "cpu_threads",
+        "host_cache_gib",
+        "engram_storage",
+        "engram_cache_gib",
+        "expert_profile",
+        "expert_profile_interval",
+        "overlap_decode",
+        "r8_refill",
+        "adaptive_cache",
+        "route_tail_skip",
+        "route_tail_skip_mm",
+    }
+    if unknown:
+        raise ValueError(f"Unknown DeepSeek hybrid options: {sorted(unknown)}")
+    tail_skip = settings.get("route_tail_skip", 0)
+    tail_skip_mm = settings.get("route_tail_skip_mm")
+    for name, rank in (
+        ("route_tail_skip", tail_skip),
+        ("route_tail_skip_mm", tail_skip_mm),
+    ):
+        if name == "route_tail_skip_mm" and rank is None:
+            continue
+        if type(rank) is not int or not 0 <= rank < 8:
+            raise ValueError(f"{name} must be an integer from 0 to 7")
+    if type(settings.setdefault("overlap_decode", True)) is not bool:
+        raise ValueError("overlap_decode must be a boolean")
+    if type(settings.setdefault("r8_refill", True)) is not bool:
+        raise ValueError("r8_refill must be a boolean")
+    if "adaptive_cache" in settings:
+        from .cache_capacity import capacity_settings
+
+        adaptive = capacity_settings(settings["adaptive_cache"])
+        if adaptive is None:
+            settings.pop("adaptive_cache")
+        else:
+            settings["adaptive_cache"] = adaptive
+    profile = settings.get("expert_profile")
+    if (
+        "expert_profile" in settings
+        and profile is not False
+        and (not isinstance(profile, str) or not profile)
+    ):
+        raise ValueError("expert_profile must be a nonempty path or false")
+    if "expert_profile_interval" in settings and (
+        profile is False
+        or type(settings["expert_profile_interval"]) is not int
+        or settings["expert_profile_interval"] < 1
+    ):
+        raise ValueError(
+            "expert_profile_interval requires enabled persistence and a positive count"
+        )
+    storage = settings.get("engram_storage", "ram")
+    if storage not in ("ram", "ssd"):
+        raise ValueError("engram_storage must be 'ram' or 'ssd'")
+    if storage == "ssd":
+        cache = settings.get("engram_cache_gib", 1)
+        if (
+            type(cache) not in (int, float)
+            or cache < 0
+            or (isinstance(cache, float) and not math.isfinite(cache))
+        ):
+            raise ValueError("engram_cache_gib must be a finite non-negative number")
+        if args.load_format not in ("auto", "safetensors") or (
+            args.safetensors_load_strategy not in (None, "lazy")
+        ):
+            raise ValueError("Engram SSD requires lazy safetensors loading")
+        args.safetensors_load_strategy = "lazy"
+    elif "engram_cache_gib" in settings:
+        raise ValueError("engram_cache_gib requires engram_storage='ssd'")
+    layers = settings.get("pipeline_layers")
+    cpu_start = settings.setdefault("cpu_expert_start_layer", 20)
+    cpu_end = settings.setdefault("cpu_expert_end_layer", 40)
+    ced_prefill = settings.setdefault("ced_prefill", True)
+    if (
+        type(cpu_start) is not int
+        or type(cpu_end) is not int
+        or not 0 <= cpu_start < cpu_end <= 40
+    ):
+        raise ValueError("CPU expert layer range must be within model layers 0-39")
+    if type(ced_prefill) is not bool:
+        raise ValueError("ced_prefill must be a boolean")
+    if (
+        not isinstance(layers, list)
+        or len(layers) != args.pipeline_parallel_size
+        or any(type(n) is not int or n < 1 for n in layers)
+        or sum(layers) != 40
+        or (ced_prefill and sum(layers[:-1]) > 19)
+    ):
+        raise ValueError(
+            "pipeline_layers must partition 40 layers; CED prefill additionally "
+            "requires layers 19–39 on the last PP stage"
+        )
+    threads = settings.get("cpu_threads", 22)
+    threads = [threads, threads] if type(threads) is int else threads
+    if (
+        not isinstance(threads, list)
+        or len(threads) != 2
+        or any(type(n) is not int or n < 1 for n in threads)
+    ):
+        raise ValueError("cpu_threads must be positive or [prefill, decode]")
+    budget = settings.setdefault("host_cache_gib", 0)
+    if type(budget) not in (int, float) or not 0 <= budget <= 64:
+        raise ValueError("host_cache_gib must be between 0 and 64")
+    if (
+        args.tensor_parallel_size != 1
+        or args.data_parallel_size != 1
+        or args.nnodes != 1
+    ):
+        raise ValueError("DeepSeek CPU hybrid requires TP1 and DP1 on one host")
+    if args.distributed_executor_backend not in (None, "mp"):
+        raise ValueError("DeepSeek CPU hybrid currently requires the local mp executor")
+    for key in ("cpu_moe", "pp_kv_transfer", "cpu_phase_threads"):
+        if key in args.additional_config:
+            raise ValueError(f"{key} cannot be combined with deepseek_v41_hybrid")
+    if args.max_num_seqs is None:
+        args.max_num_seqs = 1
+    if args.enable_prefix_caching is None:
+        args.enable_prefix_caching = False
+    if args.max_num_batched_tokens is None:
+        args.max_num_batched_tokens = 2048
+    if not args.reasoning_parser:
+        args.reasoning_parser = "deepseek_v41"
+    from vllm.config import CUDAGraphMode
+
+    if args.compilation_config.cudagraph_mode is None:
+        args.compilation_config.cudagraph_mode = CUDAGraphMode.FULL_DECODE_ONLY
+    if args.speculative_config is not None:
+        spec = args.speculative_config
+        if spec.get("method") != "dspark":
+            raise ValueError("DeepSeek CPU hybrid supports DSpark speculation only")
+        spec.setdefault("num_speculative_tokens", 3)
+        spec.setdefault(
+            "dspark_num_query_tokens", max(5, int(spec["num_speculative_tokens"]))
+        )
+        spec.setdefault("use_local_argmax_reduction", True)
+    libraries = native_libraries()
+    args.additional_config.update(
+        cpu_moe={
+            "backend": "ik",
+            "start_layer": cpu_start,
+            "end_layer": cpu_end,
+            "num_threads": threads[0],
+            "library_path": str(libraries[0]),
+            "cuda_library_path": str(libraries[1]),
+            "route_tail_skip": tail_skip,
+            "route_tail_skip_mm": tail_skip_mm,
+        },
+        ced_prefill=ced_prefill,
+        pp_kv_transfer=True,
+        cpu_phase_threads=threads,
+    )
+    args._dsv41_hybrid_defaults = True
+
+
+def cpu_expert_layer_count(settings):
+    return settings["cpu_expert_end_layer"] - settings["cpu_expert_start_layer"]
+
+
+def cpu_expert_layer_ids(settings):
+    return range(settings["cpu_expert_start_layer"], settings["cpu_expert_end_layer"])
+
+
+def plan_engram_cache(settings, num_embeddings, head_dim):
+    """Split the host cache budget evenly, capped by FP8 table and scale bytes."""
+    sizes = [rows * (head_dim + head_dim // 32) for rows in num_embeddings]
+    total = sum(sizes)
+    requested = settings.get("engram_cache_gib", 1)
+    remaining = total if requested >= total / GiB else int(requested * GiB)
+    result = [0] * len(sizes)
+    for rank, index in enumerate(sorted(range(len(sizes)), key=sizes.__getitem__)):
+        result[index] = min(sizes[index], remaining // (len(sizes) - rank))
+        remaining -= result[index]
+    return tuple(result)
+
+
+def plan_expert_cache(capacities, num_layers=20, bank_size=384, local_device=None):
+    """Distribute bounded slots fairly, preferring local execution when it fits."""
+    remaining = list(capacities)
+    result = []
+    for layer in range(num_layers):
+        target = min(bank_size - 1, sum(remaining) // (num_layers - layer))
+        if target < 8:
+            result.append((local_device or 0, 0))
+            continue
+        target = target // 8 * 8
+        device = max(range(len(remaining)), key=lambda d: remaining[d])
+        if local_device is not None and remaining[local_device] >= target:
+            device = local_device
+        count = min(target, remaining[device]) // 8 * 8
+        result.append((device, count))
+        remaining[device] -= count
+    result = expand_expert_cache(result, capacities, bank_size)
+    maximum = (bank_size - 1) // 8 * 8
+    for device, capacity in enumerate(capacities):
+        if capacity < 8 or any(owner == device and count for owner, count in result):
+            continue
+        best = result
+        for layer in range(num_layers):
+            candidate = result.copy()
+            candidate[layer] = (device, min(capacity // 8 * 8, maximum))
+            candidate = expand_expert_cache(candidate, capacities, bank_size)
+            if sum(count for _, count in candidate) > sum(count for _, count in best):
+                best = candidate
+        result = best
+    return result
+
+
+def expand_expert_cache(plan, capacities, bank_size=384):
+    """Fill aligned spare capacity without changing the cache devices."""
+    result = list(plan)
+    remaining = list(capacities)
+    for device, count in result:
+        remaining[device] -= count
+    while True:
+        candidates = [
+            i
+            for i, (device, count) in enumerate(result)
+            if count and count + 8 < bank_size and remaining[device] >= 8
+        ]
+        if not candidates:
+            break
+        layer = min(candidates, key=lambda i: result[i][1])
+        device, count = result[layer]
+        result[layer] = (device, count + 8)
+        remaining[device] -= 8
+    return result
+
+
+def minimum_cache_reserve(total, utilization):
+    """Keep existing slots when at least 60% of the planned reserve remains."""
+    reserve = int(total * (1 - utilization))
+    return (reserve * 3 + 4) // 5
+
+
+def calibrated_expert_capacities(memory, plan, expert_bytes, utilization):
+    """Subtract measured runtime headroom from post-capture device memory."""
+    capacities = []
+    for device, (free, total, headroom) in enumerate(memory):
+        slots = sum(count for owner, count in plan if owner == device)
+        weights = slots * expert_bytes
+        reserve = int(total * (1 - utilization)) + headroom
+        capacity = max(0, (free + weights - reserve) // expert_bytes)
+        if free - headroom >= minimum_cache_reserve(total, utilization):
+            capacity = max(slots, capacity)
+        capacities.append(capacity)
+    return capacities
+
+
+def native_libraries():
+    import vllm
+
+    libdir = Path(vllm.__file__).parent
+    libraries = [libdir / f"libdsv41_{name}.so" for name in ("ik", "cuda")]
+    if any(not library.is_file() for library in libraries):
+        raise RuntimeError(
+            "DeepSeek hybrid native libraries are not installed. Install this "
+            "branch from source with VLLM_USE_PRECOMPILED unset, or build and "
+            "install the libdsv41_ik and libdsv41_cuda CMake targets. Upstream "
+            "precompiled wheels do not contain this branch's hybrid backends."
+        )
+    return libraries

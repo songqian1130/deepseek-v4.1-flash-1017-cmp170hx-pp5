@@ -1,0 +1,239 @@
+{
+  "benchmark": "matched-real-text-wall-clock",
+  "model": "deepseek-v4.1-flash-1017",
+  "base": "http://localhost:9010/v1",
+  "repeats": 3,
+  "cases": 9,
+  "results": [
+    {
+      "prompt": "用中文解释为什么昼夜交替发生，并给出一个生活中的例子。",
+      "text": "我们需要回答中文。需要解释昼夜交替发生原因，并给生活例子。要简洁。需要可能提到地球自转，不发光不透明，太阳照射一半，地球自转使各地轮流进入光照和背光。例子：白天黑夜，比如早上太阳升起上学，晚上回家开灯；或地球仪手电筒实验。用中文。注意“昼夜交替”不是公转。给出生活例子。可以解释周期约24小时。最终。昼夜交替是因为地球是一个不发光、不透明的球体，太阳只能照亮地球的一半。被太阳照到的一面是白天，背对太阳的一面是黑夜。地球又在不停地自转，所以同一个地方会轮流转到向阳面和背阳面，于是白天和黑夜不断交替，大约每24小时一次。\n\n生活中的例子：你早上出门时天亮了，在学校上课时是白天；傍晚回家后太阳落下，天慢慢变黑，晚上开灯",
+      "elapsed_s": 5.0409,
+      "ttft_s": 0.5001,
+      "decode_s": 4.5408,
+      "completion_tokens": 192,
+      "decode_tok_s": 42.283,
+      "end_to_end_tok_s": 38.089,
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 236,
+        "completion_tokens": 192,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 96
+        }
+      },
+      "repeat": 1,
+      "index": 1
+    },
+    {
+      "prompt": "Explain in English how a hash table provides average constant-time lookup, including one caveat.",
+      "text": "We need answer explain hash table average O(1) lookup including caveat. Need concise. Explain hashing key to bucket index, array access, collisions handled, average constant if good hash and load factor. Caveat worst-case O(n) due collisions/adversarial keys, resizing, poor hash. Need English. Maybe mention amortized. Desired oververbosity 5. Provide clear.A hash table gives **average constant-time lookup** by turning a key into an array index:\n\n1. A **hash function** maps the key to an integer.\n2. That integer is reduced modulo the number of buckets, giving a bucket index.\n3. The table stores the key/value in that bucket, so lookup usually requires only:\n   - compute the hash,\n   - index into the bucket array,\n   - compare the key.\n\nIf the hash function spreads keys evenly and the **load factor** (entries per bucket) is kept low,",
+      "elapsed_s": 5.0319,
+      "ttft_s": 0.5136,
+      "decode_s": 4.5182,
+      "completion_tokens": 192,
+      "decode_tok_s": 42.494,
+      "end_to_end_tok_s": 38.157,
+      "usage": {
+        "prompt_tokens": 48,
+        "total_tokens": 240,
+        "completion_tokens": 192,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 81
+        }
+      },
+      "repeat": 1,
+      "index": 2
+    },
+    {
+      "prompt": "Write a Python function named clamp that takes x, low, and high and returns x limited to that inclusive range. Include only the function and a short comment.",
+      "text": "We need answer only function and short comment. Need ensure inclusive range. If low > high? Not specified. Standard clamp assumes low <= high. Could implement max(low, min(x, high)). Include short comment. Only function and comment.```python\ndef clamp(x, low, high):\n    # Limit x to the inclusive range [low, high]\n    return max(low, min(x, high))\n```",
+      "elapsed_s": 2.5605,
+      "ttft_s": 0.529,
+      "decode_s": 2.0314,
+      "completion_tokens": 87,
+      "decode_tok_s": 42.827,
+      "end_to_end_tok_s": 33.978,
+      "usage": {
+        "prompt_tokens": 62,
+        "total_tokens": 149,
+        "completion_tokens": 87,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 49
+        }
+      },
+      "repeat": 1,
+      "index": 3
+    },
+    {
+      "prompt": "用中文解释为什么昼夜交替发生，并给出一个生活中的例子。",
+      "text": "我们需要回答中文。需要解释昼夜交替发生原因，并给生活例子。要简洁。需要可能提到地球自转，不发光不透明，太阳照射一半，地球自转使各地轮流进入光照和背光。例子：白天黑夜，比如早上太阳升起上学，晚上回家开灯；或地球仪手电筒实验。用中文。注意“昼夜交替”不是公转。给出生活例子。可以解释周期约24小时。最终。昼夜交替是因为地球是一个不发光、不透明的球体，太阳只能照亮地球的一半。被太阳照到的一面是白天，背对太阳的一面是黑夜。地球又在不停地自转，所以同一个地方会轮流转到向阳面和背阳面，于是白天和黑夜不断交替，大约每24小时一次。\n\n生活中的例子：你早上出门时天亮了，在学校上课时是白天；傍晚回家后太阳落下，天慢慢变黑，晚上开灯",
+      "elapsed_s": 5.0711,
+      "ttft_s": 0.5443,
+      "decode_s": 4.5268,
+      "completion_tokens": 192,
+      "decode_tok_s": 42.414,
+      "end_to_end_tok_s": 37.861,
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 236,
+        "completion_tokens": 192,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 96
+        }
+      },
+      "repeat": 2,
+      "index": 1
+    },
+    {
+      "prompt": "Explain in English how a hash table provides average constant-time lookup, including one caveat.",
+      "text": "We need answer explain hash table average O(1) lookup including caveat. Need concise. Explain hashing key to bucket index, array access, collisions handled, average constant if good hash and load factor. Caveat worst-case O(n) due collisions/adversarial keys, resizing, poor hash. Need English. Maybe mention amortized. Desired oververbosity 5. Provide clear.A hash table gives **average constant-time lookup** by turning a key into an array index:\n\n1. A **hash function** maps the key to an integer.\n2. That integer is reduced modulo the number of buckets, giving a bucket index.\n3. The table stores the key/value in that bucket, so lookup usually requires only:\n   - compute the hash,\n   - index into the bucket array,\n   - compare the key.\n\nIf the hash function spreads keys evenly and the **load factor** (entries per bucket) is kept low,",
+      "elapsed_s": 5.0289,
+      "ttft_s": 0.508,
+      "decode_s": 4.5208,
+      "completion_tokens": 192,
+      "decode_tok_s": 42.47,
+      "end_to_end_tok_s": 38.18,
+      "usage": {
+        "prompt_tokens": 48,
+        "total_tokens": 240,
+        "completion_tokens": 192,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 81
+        }
+      },
+      "repeat": 2,
+      "index": 2
+    },
+    {
+      "prompt": "Write a Python function named clamp that takes x, low, and high and returns x limited to that inclusive range. Include only the function and a short comment.",
+      "text": "We need answer only function and short comment. Need ensure inclusive range. If low > high? Not specified. Standard clamp assumes low <= high. Could implement max(low, min(x, high)). Include short comment. Only function and comment.```python\ndef clamp(x, low, high):\n    # Limit x to the inclusive range [low, high]\n    return max(low, min(x, high))\n```",
+      "elapsed_s": 2.571,
+      "ttft_s": 0.5328,
+      "decode_s": 2.0382,
+      "completion_tokens": 87,
+      "decode_tok_s": 42.684,
+      "end_to_end_tok_s": 33.838,
+      "usage": {
+        "prompt_tokens": 62,
+        "total_tokens": 149,
+        "completion_tokens": 87,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 49
+        }
+      },
+      "repeat": 2,
+      "index": 3
+    },
+    {
+      "prompt": "用中文解释为什么昼夜交替发生，并给出一个生活中的例子。",
+      "text": "我们需要回答中文。需要解释昼夜交替发生原因，并给生活例子。要简洁。需要可能提到地球自转，不发光不透明，太阳照射一半，地球自转使各地轮流进入光照和背光。例子：白天黑夜，比如早上太阳升起上学，晚上回家开灯；或地球仪手电筒实验。用中文。注意“昼夜交替”不是公转。给出生活例子。可以解释周期约24小时。最终。昼夜交替是因为地球是一个不发光、不透明的球体，太阳只能照亮地球的一半。被太阳照到的一面是白天，背对太阳的一面是黑夜。地球又在不停地自转，所以同一个地方会轮流转到向阳面和背阳面，于是白天和黑夜不断交替，大约每24小时一次。\n\n生活中的例子：你早上出门时天亮了，在学校上课时是白天；傍晚回家后太阳落下，天慢慢变黑，晚上开灯",
+      "elapsed_s": 5.0463,
+      "ttft_s": 0.5245,
+      "decode_s": 4.5217,
+      "completion_tokens": 192,
+      "decode_tok_s": 42.462,
+      "end_to_end_tok_s": 38.048,
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 236,
+        "completion_tokens": 192,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 96
+        }
+      },
+      "repeat": 3,
+      "index": 1
+    },
+    {
+      "prompt": "Explain in English how a hash table provides average constant-time lookup, including one caveat.",
+      "text": "We need answer explain hash table average O(1) lookup including caveat. Need concise. Explain hashing key to bucket index, array access, collisions handled, average constant if good hash and load factor. Caveat worst-case O(n) due collisions/adversarial keys, resizing, poor hash. Need English. Maybe mention amortized. Desired oververbosity 5. Provide clear.A hash table gives **average constant-time lookup** by turning a key into an array index:\n\n1. A **hash function** maps the key to an integer.\n2. That integer is reduced modulo the number of buckets, giving a bucket index.\n3. The table stores the key/value in that bucket, so lookup usually requires only:\n   - compute the hash,\n   - index into the bucket array,\n   - compare the key.\n\nIf the hash function spreads keys evenly and the **load factor** (entries per bucket) is kept low,",
+      "elapsed_s": 5.0284,
+      "ttft_s": 0.4978,
+      "decode_s": 4.5306,
+      "completion_tokens": 192,
+      "decode_tok_s": 42.378,
+      "end_to_end_tok_s": 38.183,
+      "usage": {
+        "prompt_tokens": 48,
+        "total_tokens": 240,
+        "completion_tokens": 192,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 81
+        }
+      },
+      "repeat": 3,
+      "index": 2
+    },
+    {
+      "prompt": "Write a Python function named clamp that takes x, low, and high and returns x limited to that inclusive range. Include only the function and a short comment.",
+      "text": "We need answer only function and short comment. Need ensure inclusive range. If low > high? Not specified. Standard clamp assumes low <= high. Could implement max(low, min(x, high)). Include short comment. Only function and comment.```python\ndef clamp(x, low, high):\n    # Limit x to the inclusive range [low, high]\n    return max(low, min(x, high))\n```",
+      "elapsed_s": 2.5732,
+      "ttft_s": 0.5321,
+      "decode_s": 2.0411,
+      "completion_tokens": 87,
+      "decode_tok_s": 42.624,
+      "end_to_end_tok_s": 33.811,
+      "usage": {
+        "prompt_tokens": 62,
+        "total_tokens": 149,
+        "completion_tokens": 87,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 49
+        }
+      },
+      "repeat": 3,
+      "index": 3
+    }
+  ],
+  "comparison": {
+    "reference_repository": "https://github.com/344303947/dsv41-flash-pp5-170hx",
+    "user_target_decode_tok_s": 50,
+    "matched_benchmark": false,
+    "note": "The target is user-requested, not a measured reference result. A repository performance comparison requires the same prompts, token budget, thinking mode, warmup, concurrency, and wall-clock measurement on both deployments."
+  },
+  "summary": {
+    "mean_decode_tok_s": 42.515,
+    "median_decode_tok_s": 42.47,
+    "min_decode_tok_s": 42.283,
+    "max_decode_tok_s": 42.827,
+    "mean_end_to_end_tok_s": 36.683,
+    "median_end_to_end_tok_s": 38.048
+  }
+}

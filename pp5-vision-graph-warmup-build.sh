@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+ROOT=${ROOT:-/srv/models/deploy-llm/isolated-pp5-engram-mmap-20261031}
+BASE_IMAGE=${BASE_IMAGE:-local/deepseek-v41-official-pp5:alex-engram-mmap-20261031-r1}
+IMAGE=${IMAGE:-local/deepseek-v41-official-pp5:alex-engram-mmap-20261031-r3-pp-capture-ids}
+SOURCE_COMMIT=b3d5e18081285f75eb55e1e7a1c45e209d612e35
+CONTEXT="$ROOT/pp5-graph-build-context"
+LOG="$ROOT/reports/pp5-graph-build.log"
+PHASE_FILE="$ROOT/reports/pp5-graph-build.phase"
+
+mkdir -p "$ROOT/reports"
+exec > >(tee -a "$LOG") 2>&1
+START=$(date +%s)
+phase() { printf '%s\n' "$1" > "$PHASE_FILE"; }
+heartbeat() {
+  while sleep 20; do
+    EL=$(( $(date +%s) - START ))
+    echo "[HB ${EL}s] phase=$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)"
+  done
+}
+heartbeat & HB_PID=$!
+finish() { kill "$HB_PID" 2>/dev/null || true; wait "$HB_PID" 2>/dev/null || true; }
+trap finish EXIT
+fail() { phase BUILD_FAIL; echo "[HB] phase=BUILD_FAIL reason=$*"; exit 1; }
+
+phase preflight
+echo "[HB 0s] phase=preflight base=$BASE_IMAGE image=$IMAGE"
+docker image inspect "$BASE_IMAGE" >/dev/null || fail "verified mmap base image is missing"
+[[ $(docker image inspect -f '{{index .Config.Labels "local.deepseek.pp5-source"}}' "$BASE_IMAGE") == "$SOURCE_COMMIT" ]] || fail "PP5 source label mismatch"
+[[ $(docker image inspect -f '{{index .Config.Labels "local.deepseek.engram"}}' "$BASE_IMAGE") == alexbrandes-mmap-fp8-row-gather ]] || fail "base image does not contain Engram mmap"
+docker image inspect "$IMAGE" >/dev/null 2>&1 && fail "target image tag already exists: $IMAGE"
+
+phase image-build
+mkdir -p "$CONTEXT"
+cp "$HERE/pp5-vision-graph-warmup.Containerfile" "$HERE/pp5-capture-input-ids.patch" "$HERE/verify-pp5-capture-input-ids.py" "$CONTEXT/"
+sed -i 's/\r$//' "$CONTEXT/pp5-capture-input-ids.patch"
+timeout --foreground 900 docker build --pull=false --network host \
+  --build-arg "BASE_IMAGE=$BASE_IMAGE" \
+  --file "$CONTEXT/pp5-vision-graph-warmup.Containerfile" \
+  --tag "$IMAGE" "$CONTEXT"
+
+[[ $(docker image inspect -f '{{index .Config.Labels "local.deepseek.graph-warmup"}}' "$IMAGE") == pp-capture-preserve-input-ids ]] || fail "graph warmup label mismatch"
+[[ $(docker image inspect -f '{{index .Config.Labels "local.deepseek.pp5-source"}}' "$IMAGE") == "$SOURCE_COMMIT" ]] || fail "PP5 source label mismatch"
+phase BUILD_DONE
+echo "[HB] phase=BUILD_DONE image=$IMAGE source=$SOURCE_COMMIT"

@@ -1,0 +1,47 @@
+{
+  "ok": true,
+  "checks": [
+    {
+      "name": "arithmetic",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "probability",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ordering",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "median-code",
+      "passed": true,
+      "detail": "Five executable tests; original list preserved"
+    },
+    {
+      "name": "multi-turn",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "long-context",
+      "passed": true,
+      "detail": "prompt_tokens=4729"
+    },
+    {
+      "name": "concurrent-arithmetic",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "concurrent-string",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "elapsed_s": 42.06542259699199,
+  "scope": "Complete answers and concurrency/context smoke; not an exhaustive intelligence benchmark. Weight/quantization unchanged and separate score-parity evidence required."
+}

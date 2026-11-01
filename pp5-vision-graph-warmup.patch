@@ -1,0 +1,20 @@
+diff --git a/vllm/models/deepseek_v4/nvidia/model.py b/vllm/models/deepseek_v4/nvidia/model.py
+--- a/vllm/models/deepseek_v4/nvidia/model.py
++++ b/vllm/models/deepseek_v4/nvidia/model.py
+@@ -1025,3 +1025,16 @@
+         bias_vl = getattr(self.gate, "bias_vl", None)
++        if (
++            input_ids is None
++            and self.gate.tid2eid is None
++            and bias_vl is not None
++            and self.image_sentinel_lo > 0
++            and torch.cuda.is_available()
++            and torch.cuda.is_current_stream_capturing()
++        ):
++            # Graph warmup has no user IDs; zero selects the text routing bias.
++            num_tokens = hidden_states.numel() // hidden_states.shape[-1]
++            input_ids = torch.zeros(
++                num_tokens, dtype=torch.long, device=hidden_states.device
++            )
+         if bias_vl is not None and input_ids is None:
+             raise ValueError("DeepSeek V4 vision MoE routing requires input_ids.")

@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-31",
+  "scope": "9010 original launcher parameter alignment; runtime acceptance pending",
+  "source_tag": "v41-pp5-1m-pinmem-20260916",
+  "source_commit": "9d0f9181756ec3100e302bbf04e313baa3f54bbf",
+  "source_url": "https://raw.githubusercontent.com/344303947/dsv41-flash-pp5-170hx/v41-pp5-1m-pinmem-20260916/dsv41-pp5/start_vllm_v41_pp5.sh",
+  "matched_defaults": [
+    {
+      "reference": "OFFLOAD_RANKS",
+      "value": "0,0,0,0,0",
+      "adapted": "CPU_OFFLOAD_PER_RANK"
+    },
+    {
+      "reference": "GPU_UTIL",
+      "value": "0.97",
+      "adapted": "GPU_MEMORY_UTILIZATION"
+    },
+    {
+      "reference": "MAXLEN",
+      "value": "1048576",
+      "adapted": "MAX_MODEL_LEN"
+    },
+    {
+      "reference": "PORT",
+      "value": "9010",
+      "adapted": "PORT"
+    },
+    {
+      "reference": "MAX_BATCHED",
+      "value": "2048",
+      "adapted": "MAX_NUM_BATCHED_TOKENS"
+    },
+    {
+      "reference": "MAX_SEQS",
+      "value": "8",
+      "adapted": "MAX_NUM_SEQS"
+    }
+  ],
+  "topology": "PP5/TP1, 8,8,8,8,8",
+  "speculation": "plain",
+  "capture_sizes": [
+    1,
+    2,
+    4,
+    8
+  ],
+  "bash_n": "2/2 passed",
+  "line_endings": "LF",
+  "wrapper_checks": "help, unknown-option rejection, missing-value rejection passed",
+  "known_differences": [
+    "Engram SSD mmap",
+    "PIECEWISE instead of default FULL_AND_PIECEWISE; reference --piecewise option",
+    "Local model/image/service identity, loopback bind, container deployment; public reference API key omitted",
+    "Engine b3d5e180 retained"
+  ],
+  "previous_trial": {
+    "root_cause": "rank0 KV cache budget -0.24 GiB; no cache blocks",
+    "seqs": 16,
+    "oom": false,
+    "exit": 1,
+    "port": 18122,
+    "batch": 8096
+  },
+  "runtime_acceptance": "pending; no throughput conclusion for the 9010 profile"
+}

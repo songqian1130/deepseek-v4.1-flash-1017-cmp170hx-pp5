@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-31",
+  "scope": "PP CUDA graph input-construction regression only; GPU service acceptance pending",
+  "failed_service": {
+    "name": "deepseek-v41-pp5-alex-engram-mmap-20261031-original-9010",
+    "finished_at_china_time": "2026-10-31T22:53:18+08:00",
+    "exit_code": 1,
+    "container_oom_killed": false,
+    "exception": "DeepSeek V4 vision MoE routing requires input_ids.",
+    "failure_phase": "capture_model -> capture -> forward_fn(CUDAGraphMode.NONE)",
+    "available_kv_cache_gib_before_failure": 1.73
+  },
+  "root_cause": "Capture input factory cleared input_ids on every non-first PP rank, including DeepSeek V4.1 vision/hash MoE stages.",
+  "patch": "pp5-capture-input-ids.patch",
+  "target": "vllm/v1/worker/gpu/cudagraph_utils.py:610",
+  "patch_scope": "Retain the original dummy ID input buffer for model_type=deepseek_v41; keep other model behavior and MoE validation unchanged.",
+  "validation": {
+    "source": "Actual failed-container source and r1 base-image source during r3 image build",
+    "old_bug_reproduced": true,
+    "gnu_patch_dry_run": "passed; fuzz=0; offset=3",
+    "python_compile": "passed",
+    "input_construction_cases_passed": 4,
+    "cases": ["DeepSeek first rank", "DeepSeek non-first rank", "other-model first rank", "other-model non-first rank"],
+    "runtime_warmup_capture_smoke_benchmark": "pending"
+  },
+  "new_image": "local/deepseek-v41-official-pp5:alex-engram-mmap-20261031-r3-pp-capture-ids",
+  "preserved_launch_parameters": "PP5/TP1; 8,8,8,8,8; 1M; batch2048; seq8; util0.97; plain; experts fully resident; PIECEWISE capture1,2,4,8"
+}

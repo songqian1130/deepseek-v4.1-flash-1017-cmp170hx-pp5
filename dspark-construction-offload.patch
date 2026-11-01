@@ -1,0 +1,124 @@
+diff --git a/vllm/model_executor/models/qwen3_dspark.py b/vllm/model_executor/models/qwen3_dspark.py
+index 1ecdf5f..ff2413d 100644
+--- a/vllm/model_executor/models/qwen3_dspark.py
++++ b/vllm/model_executor/models/qwen3_dspark.py
+@@ -52,6 +52,27 @@ from .utils import (
+ logger = init_logger(__name__)
+ 
+ 
++def _map_cpu_parameters_to_uva(module: nn.Module) -> None:
++    """Expose CPU-created DSpark head weights through CUDA UVA."""
++    if not current_platform.is_cuda():
++        return
++    from vllm.utils.platform_utils import is_uva_available
++
++    if not is_uva_available():
++        raise RuntimeError("DSpark CPU head construction requires CUDA UVA")
++    from vllm.model_executor.offloader.base import pin_exact, should_pin_memory
++    from vllm.utils.torch_utils import get_accelerator_view_from_cpu_tensor
++
++    for parameter in module.parameters():
++        if parameter.device.type != "cpu":
++            continue
++        cpu_data = parameter.data
++        if should_pin_memory():
++            cpu_data = pin_exact(cpu_data)
++        parameter.data = get_accelerator_view_from_cpu_tensor(cpu_data)
++        parameter._vllm_is_uva_offloaded = True
++
++
+ def dspark_vocab_shard_enabled() -> bool:
+     """Whether the Markov head shards ``markov_w2`` over the TP group.
+ 
+@@ -104,15 +125,21 @@ class DSparkMarkovHead(nn.Module):
+         if shard_vocab is None:
+             shard_vocab = dspark_vocab_shard_enabled()
+         self.shard_vocab = shard_vocab
+-        self.markov_w1 = nn.Embedding(vocab_size, markov_rank)
+-        self.markov_w2 = ParallelLMHead(
+-            draft_vocab_size,
+-            markov_rank,
+-            bias=False,
+-            quant_config=quant_config,
+-            prefix=maybe_prefix(prefix, "markov_w2"),
+-            disable_tp=not shard_vocab,
+-        )
++        # This head is constructed after the target model and is not part of
++        # the decoder-layer offloader traversal. Keep its temporary storage on
++        # host memory, then expose it through UVA before weights are loaded.
++        with torch.device("cpu"):
++            self.markov_w1 = nn.Embedding(vocab_size, markov_rank)
++            self.markov_w2 = ParallelLMHead(
++                draft_vocab_size,
++                markov_rank,
++                bias=False,
++                quant_config=quant_config,
++                prefix=maybe_prefix(prefix, "markov_w2"),
++                disable_tp=not shard_vocab,
++            )
++        _map_cpu_parameters_to_uva(self.markov_w1)
++        _map_cpu_parameters_to_uva(self.markov_w2)
+         self.markov_w2._retain_weight_for_gather = retain_weight_for_gather
+         self.markov_w2.is_w4a16_nvfp4 = False
+ 
+diff --git a/vllm/models/deepseek_v4_1/nvidia/dspark.py b/vllm/models/deepseek_v4_1/nvidia/dspark.py
+index c03b176..361c0e6 100644
+--- a/vllm/models/deepseek_v4_1/nvidia/dspark.py
++++ b/vllm/models/deepseek_v4_1/nvidia/dspark.py
+@@ -42,6 +42,7 @@ from vllm.model_executor.model_loader.weight_utils import default_weight_loader
+ from vllm.model_executor.models.qwen3_dspark import (
+     DSparkConfidenceHead,
+     DSparkMarkovHead,
++    _map_cpu_parameters_to_uva,
+ )
+ from vllm.model_executor.models.utils import maybe_prefix
+ from vllm.models.common.ops.sequence_parallel import (
+@@ -320,11 +321,17 @@ class DSparkDeepseekV4ForCausalLM(nn.Module):
+             vllm_config=vllm_config, prefix=maybe_prefix(prefix, "model")
+         )
+         # Shared with the target (aliased by the speculator's load utility).
+-        self.lm_head = ParallelLMHead(
+-            self.config.vocab_size,
+-            self.config.hidden_size,
+-            prefix=maybe_prefix(prefix, "lm_head"),
+-        )
++        # The target model has already consumed this PP rank's GPU budget when
++        # the DSpark model is constructed. Keep the temporary standalone head
++        # on host memory and expose it through UVA before weight loading; the
++        # loader later replaces it with the target lm_head alias.
++        with torch.device("cpu"):
++            self.lm_head = ParallelLMHead(
++                self.config.vocab_size,
++                self.config.hidden_size,
++                prefix=maybe_prefix(prefix, "lm_head"),
++            )
++        _map_cpu_parameters_to_uva(self.lm_head)
+         self.logits_processor = LogitsProcessor(self.config.vocab_size)
+ 
+     # --- Hooks used by the speculator -------------------------------------
+diff --git a/vllm/v1/worker/gpu/spec_decode/dspark/utils.py b/vllm/v1/worker/gpu/spec_decode/dspark/utils.py
+index 5b13530..f5370e3 100644
+--- a/vllm/v1/worker/gpu/spec_decode/dspark/utils.py
++++ b/vllm/v1/worker/gpu/spec_decode/dspark/utils.py
+@@ -5,6 +5,7 @@ import torch.nn as nn
+ 
+ from vllm.config import ModelConfig, VllmConfig, replace
+ from vllm.logger import init_logger
++from vllm.model_executor.offloader import create_offloader, set_offloader
+ from vllm.v1.attention.backends.registry import AttentionBackendEnum
+ 
+ logger = init_logger(__name__)
+@@ -78,6 +79,13 @@ def load_dspark_model(target_model: nn.Module, vllm_config: VllmConfig) -> nn.Mo
+     # config is retained for DSpark's target-layer metadata, so we must override it.
+     draft_vllm_config.quant_config = get_draft_quant_config(vllm_config)
+ 
++    # The target model has already consumed the process-global offloader budget.
++    # DSpark is a second model owned by the last PP rank, so give its layer stack
++    # an independent budget before construction. Without this reset the draft
++    # layers are all materialized on the already-full GPU before their weights
++    # can be wrapped.
++    set_offloader(create_offloader(draft_vllm_config.offload_config))
++
+     with set_model_tag("dspark_head"):
+         draft_model = get_model(
+             vllm_config=draft_vllm_config, model_config=draft_model_config

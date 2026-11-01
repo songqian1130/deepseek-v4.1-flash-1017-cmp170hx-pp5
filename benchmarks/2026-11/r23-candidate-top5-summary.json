@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "pairs": [
+    {
+      "case": 0,
+      "message_equal": true,
+      "logprob_entries": 384,
+      "top_tokens_equal": true,
+      "max_logprob_abs_diff": 0.0,
+      "passed": true
+    },
+    {
+      "case": 1,
+      "message_equal": true,
+      "logprob_entries": 384,
+      "top_tokens_equal": true,
+      "max_logprob_abs_diff": 0.0,
+      "passed": true
+    },
+    {
+      "case": 2,
+      "message_equal": true,
+      "logprob_entries": 384,
+      "top_tokens_equal": true,
+      "max_logprob_abs_diff": 0.0,
+      "passed": true
+    },
+    {
+      "case": 3,
+      "message_equal": true,
+      "logprob_entries": 384,
+      "top_tokens_equal": true,
+      "max_logprob_abs_diff": 0.0,
+      "passed": true
+    },
+    {
+      "case": 4,
+      "message_equal": true,
+      "logprob_entries": 384,
+      "top_tokens_equal": true,
+      "max_logprob_abs_diff": 0.0,
+      "passed": true
+    }
+  ]
+}

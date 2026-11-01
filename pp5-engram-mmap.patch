@@ -1,0 +1,605 @@
+diff --git a/vllm/model_executor/model_loader/weight_utils.py b/vllm/model_executor/model_loader/weight_utils.py
+index 3085df8..4ed0d3c 100644
+--- a/vllm/model_executor/model_loader/weight_utils.py
++++ b/vllm/model_executor/model_loader/weight_utils.py
+@@ -863,6 +863,18 @@ def _prefetch_all_checkpoints(
+     threading.Thread(target=_run_prefetch, daemon=True).start()
+ 
+ 
++def _engram_mmap_enabled() -> bool:
++    return os.environ.get("VLLM_ENGRAM_MMAP", "0").lower() in ("1", "true", "yes")
++
++
++def _is_engram_mmap_weight(name: str) -> bool:
++    return (
++        _engram_mmap_enabled()
++        and ".engram.embed." in name
++        and name.rsplit(".", 1)[-1] in ("weight", "scale")
++    )
++
++
+ def safetensors_weights_iterator(
+     hf_weights_files: list[str],
+     use_tqdm_on_load: bool,
+@@ -878,6 +890,11 @@ def safetensors_weights_iterator(
+     this rank are skipped **before** reading from disk, which drastically
+     reduces storage I/O for MoE models under EP.
+     """
++    if _engram_mmap_enabled() and safetensors_load_strategy in ("eager", "prefetch"):
++        raise ValueError(
++            "Engram mmap requires lazy safetensors reads; eager/prefetch would "
++            "materialize or scan the full Engram tables"
++        )
+     loading_desc = "Loading safetensors checkpoint shards"
+     if safetensors_load_strategy == "eager":
+         loading_desc += " (eager)"
+@@ -976,7 +993,7 @@ def safetensors_weights_iterator(
+             with safe_open(st_file, framework="pt") as f:
+                 state_dict = {}
+                 for name in f.keys():  # noqa: SIM118
+-                    if should_skip_weight(name, local_expert_ids):
++                    if should_skip_weight(name, local_expert_ids) or _is_engram_mmap_weight(name):
+                         continue
+                     state_dict[name] = f.get_tensor(name)
+ 
+@@ -994,7 +1011,7 @@ def safetensors_weights_iterator(
+         else:
+             with safe_open(st_file, framework="pt") as f:
+                 for name in f.keys():  # noqa: SIM118
+-                    if should_skip_weight(name, local_expert_ids):
++                    if should_skip_weight(name, local_expert_ids) or _is_engram_mmap_weight(name):
+                         continue
+                     param = f.get_tensor(name)
+                     yield name, param
+@@ -1006,6 +1023,10 @@ def multi_thread_safetensors_weights_iterator(
+     max_workers: int = 4,
+ ) -> Generator[tuple[str, torch.Tensor], None, None]:
+     """Multi-Thread iterate over the weights in the model safetensor files."""
++    if _engram_mmap_enabled():
++        raise ValueError(
++            "Engram mmap requires the serial safetensors iterator to skip table tensors"
++        )
+ 
+     def _load_file(st_file: str):
+         result = load_file(st_file, device="cpu")
+diff --git a/vllm/models/deepseek_v4_1/common/engram.py b/vllm/models/deepseek_v4_1/common/engram.py
+index 8d42f36..f55adcc 100644
+--- a/vllm/models/deepseek_v4_1/common/engram.py
++++ b/vllm/models/deepseek_v4_1/common/engram.py
+@@ -34,7 +34,9 @@ chunk-by-chunk while an n-gram at position ``p`` needs the token ids at
+   cache for the rest.
+ """
+ 
++import os
+ import weakref
++from concurrent.futures import Future, ThreadPoolExecutor
+ 
+ import numpy as np
+ import torch
+@@ -57,6 +59,8 @@ from vllm.utils.platform_utils import is_uva_available
+ from vllm.utils.torch_utils import get_accelerator_view_from_cpu_tensor
+ from vllm.v1.attention.ops.fp8_sm80 import _decode_fp8_f32
+ 
++from .engram_mmap import MmapEngramTable
++
+ logger = init_logger(__name__)
+ 
+ # Cache value for tokens that take no part in an n-gram (image spans).
+@@ -676,6 +680,34 @@ def _engram_lookup_kernel(
+         )
+ 
+ 
++@triton.jit
++def _engram_lookup_mmap_rows_kernel(
++    weight,
++    scales,
++    out,
++    num_rows,
++    DIM: tl.constexpr,
++    QUANT_BLOCK: tl.constexpr,
++    BLOCK_D: tl.constexpr,
++):
++    row = tl.program_id(0)
++    cols = tl.arange(0, BLOCK_D)
++    valid = (row < num_rows) & (cols < DIM)
++    values = tl.load(weight + row * DIM + cols, valid, other=0)
++    values = _decode_fp8_f32(values, False)
++    scale = tl.load(
++        scales + row * (DIM // QUANT_BLOCK) + cols // QUANT_BLOCK,
++        valid,
++        other=0,
++    )
++    scale = (scale.to(tl.int32) << 23).to(tl.float32, bitcast=True)
++    tl.store(
++        out + row * DIM + cols,
++        (values * scale).to(tl.bfloat16),
++        valid,
++    )
++
++
+ _PINNED_KEEPALIVE: list[tuple[object, torch.Tensor, int]] = []
+ 
+ 
+@@ -756,6 +788,8 @@ class ParallelEngramEmbedding(nn.Module):
+         head_sizes: tuple[int, ...],
+         block_size: int = 32,
+         cpu_offload: bool = False,
++        layer_id: int | None = None,
++        model_path: str | None = None,
+     ):
+         super().__init__()
+         tp_size = get_tensor_model_parallel_world_size()
+@@ -776,6 +810,54 @@ class ParallelEngramEmbedding(nn.Module):
+         self.part_num_embeddings = self.vocab_end_idx - self.vocab_start_idx
+         self.tp_size = tp_size
+         self.cpu_offload = cpu_offload
++        self.mmap_enabled = os.environ.get("VLLM_ENGRAM_MMAP", "0").lower() in (
++            "1",
++            "true",
++            "yes",
++        )
++        if self.mmap_enabled:
++            runtime_config = get_current_vllm_config()
++            graph_mode = runtime_config.compilation_config.cudagraph_mode
++            if graph_mode.has_full_cudagraphs():
++                raise ValueError(
++                    "Engram mmap requires PIECEWISE or NONE CUDA graphs; "
++                    "FULL capture cannot run host-side row gathering"
++                )
++            if (
++                graph_mode.has_piecewise_cudagraphs()
++                and not envs.VLLM_USE_BREAKABLE_CUDAGRAPH
++            ):
++                raise ValueError(
++                    "Engram mmap with PIECEWISE graphs requires "
++                    "VLLM_USE_BREAKABLE_CUDAGRAPH=1"
++                )
++            if runtime_config.parallel_config.enable_dbo:
++                raise ValueError("Engram mmap currently requires DBO to be disabled")
++        if self.mmap_enabled and (not cpu_offload or layer_id is None or model_path is None):
++            raise ValueError(
++                "Engram mmap requires cpu_offload=true and a local model path"
++            )
++        self.mmap_table = (
++            MmapEngramTable(
++                model_path=model_path,
++                layer_id=layer_id,
++                rows=num_embeddings,
++                dim=dim,
++                scale_cols=dim // block_size,
++                start_row=self.vocab_start_idx,
++                local_rows=self.part_num_embeddings,
++                workers=int(os.environ.get("VLLM_ENGRAM_MMAP_WORKERS", "16")),
++            )
++            if self.mmap_enabled
++            else None
++        )
++        self._mmap_host_weight: torch.Tensor | None = None
++        self._mmap_host_scale: torch.Tensor | None = None
++        self._mmap_device_weight: torch.Tensor | None = None
++        self._mmap_device_scale: torch.Tensor | None = None
++        self._mmap_executor = ThreadPoolExecutor(max_workers=1) if self.mmap_enabled else None
++        self._mmap_future: Future[int] | None = None
++        self._mmap_h2d_event: torch.cuda.Event | None = None
+         self._views: tuple[torch.Tensor, torch.Tensor] | None = None
+         self._view_src: tuple[int, int] | None = None
+         self._num_sms = torch.cuda.get_device_properties(
+@@ -783,6 +865,8 @@ class ParallelEngramEmbedding(nn.Module):
+         ).multi_processor_count
+ 
+         def _alloc(shape: tuple[int, ...], dtype: torch.dtype) -> torch.Tensor:
++            if self.mmap_enabled:
++                return torch.empty((1, shape[-1]), dtype=dtype, device="cpu")
+             if not cpu_offload:
+                 # Explicit device: model init runs under a `torch.device("cuda")`
+                 # context, which would otherwise put the shard in HBM.
+@@ -814,6 +898,8 @@ class ParallelEngramEmbedding(nn.Module):
+                     "engram_vocab_start": self.vocab_start_idx,
+                 },
+             )
++            if self.mmap_enabled:
++                param.engram_mmap_placeholder = True
+         if cpu_offload:
+             logger.info(
+                 "Engram table offloaded to pinned host memory: %d rows x %d, "
+@@ -829,6 +915,8 @@ class ParallelEngramEmbedding(nn.Module):
+         Rebuilt if anything swaps `.data`, so a stale device pointer cannot
+         survive silently.
+         """
++        if self.mmap_table is not None:
++            raise RuntimeError("mmap Engram storage does not expose a UVA table")
+         if not self.cpu_offload:
+             return self.weight.data, self.weight_scale_inv.data
+         src = (self.weight.data_ptr(), self.weight_scale_inv.data_ptr())
+@@ -848,6 +936,10 @@ class ParallelEngramEmbedding(nn.Module):
+ 
+         `background` limits the grid to leave SMs for concurrent work.
+         """
++        if self.mmap_table is not None:
++            self.prepare_mmap_lookup(indices)
++            self.finish_mmap_lookup(out)
++            return
+         rows = indices.shape[0] * self.part_n_hash_cols
+         if not rows:
+             return
+@@ -875,6 +967,121 @@ class ParallelEngramEmbedding(nn.Module):
+             GRID=grid,
+         )
+ 
++    def _ensure_mmap_buffers(self, num_rows: int, device: torch.device) -> None:
++        if self._mmap_host_weight is None or self._mmap_host_weight.shape[0] < num_rows:
++            self._mmap_host_weight = torch.empty(
++                (num_rows, self.dim), dtype=torch.uint8, pin_memory=True
++            )
++            self._mmap_host_scale = torch.empty(
++                (num_rows, self.dim // self.block_size),
++                dtype=torch.uint8,
++                pin_memory=True,
++            )
++        if (
++            self._mmap_device_weight is None
++            or self._mmap_device_weight.shape[0] < num_rows
++            or self._mmap_device_weight.device != device
++        ):
++            self._mmap_device_weight = torch.empty(
++                (num_rows, self.dim), dtype=torch.uint8, device=device
++            )
++            self._mmap_device_scale = torch.empty(
++                (num_rows, self.dim // self.block_size),
++                dtype=torch.uint8,
++                device=device,
++            )
++
++    def _gather_mmap_rows(
++        self,
++        indices: torch.Tensor,
++        ready_event: torch.cuda.Event,
++        reuse_event: torch.cuda.Event | None,
++        num_rows: int,
++    ) -> int:
++        if reuse_event is not None:
++            reuse_event.synchronize()
++        ready_event.synchronize()
++        if indices.ndim != 2 or indices.shape[1] != self.n_hash_cols:
++            raise ValueError(
++                f"Engram mmap expected [tokens, {self.n_hash_cols}] ids, "
++                f"got {tuple(indices.shape)}"
++            )
++        num_tokens = indices.shape[0]
++        if num_rows == 0:
++            return 0
++
++        ids = indices.detach().to(device="cpu", dtype=torch.int64).numpy()
++        local_heads = np.full(
++            (num_tokens, self.part_n_hash_cols), -1, dtype=np.int64
++        )
++        first_head = self.head_start
++        available_heads = max(0, min(self.part_n_hash_cols, self.n_hash_cols - first_head))
++        if available_heads:
++            local_heads[:, :available_heads] = ids[
++                :, first_head : first_head + available_heads
++            ]
++        valid = (local_heads >= self.vocab_start_idx) & (
++            local_heads < self.vocab_end_idx
++        )
++        local_ids = np.where(valid, local_heads - self.vocab_start_idx, 0)
++
++        host_weight = self._mmap_host_weight[:num_rows]
++        host_scale = self._mmap_host_scale[:num_rows]
++        weight_np = host_weight.numpy()
++        scale_np = host_scale.numpy()
++        assert self.mmap_table is not None
++        self.mmap_table.gather_into(local_ids.reshape(-1), weight_np, scale_np)
++        invalid = ~valid.reshape(-1)
++        weight_np[invalid] = 0
++        scale_np[invalid] = 0
++        return num_rows
++
++    @eager_break_during_capture
++    def prepare_mmap_lookup(self, indices: torch.Tensor) -> None:
++        """Read the requested rows on a host worker while decoder layers run."""
++        if self.mmap_table is None or self._mmap_executor is None:
++            raise RuntimeError("Engram mmap backend is not enabled")
++        if self._mmap_future is not None:
++            self._mmap_future.result()
++        num_rows = indices.shape[0] * self.part_n_hash_cols
++        self._ensure_mmap_buffers(num_rows, indices.device)
++        ready_event = torch.cuda.Event()
++        ready_event.record(torch.cuda.current_stream(indices.device))
++        self._mmap_future = self._mmap_executor.submit(
++            self._gather_mmap_rows,
++            indices,
++            ready_event,
++            self._mmap_h2d_event,
++            num_rows,
++        )
++
++    @eager_break_during_capture
++    def finish_mmap_lookup(self, out: torch.Tensor) -> None:
++        """Wait for host rows, transfer them, and preserve GPU decode semantics."""
++        if self._mmap_future is None:
++            raise RuntimeError("Engram mmap rows were not prepared before lookup")
++        num_rows = self._mmap_future.result()
++        self._mmap_future = None
++        if num_rows == 0:
++            return
++        host_weight = self._mmap_host_weight[:num_rows]
++        host_scale = self._mmap_host_scale[:num_rows]
++        device_weight = self._mmap_device_weight[:num_rows]
++        device_scale = self._mmap_device_scale[:num_rows]
++        device_weight.copy_(host_weight, non_blocking=True)
++        device_scale.copy_(host_scale, non_blocking=True)
++        self._mmap_h2d_event = torch.cuda.Event()
++        self._mmap_h2d_event.record(torch.cuda.current_stream(out.device))
++        _engram_lookup_mmap_rows_kernel[(num_rows,)](
++            device_weight,
++            device_scale,
++            out,
++            num_rows,
++            DIM=self.dim,
++            QUANT_BLOCK=self.block_size,
++            BLOCK_D=triton.next_power_of_2(self.dim),
++        )
++
+     def forward(self, indices: torch.Tensor) -> torch.Tensor:
+         """indices: [num_tokens, n_hash_cols] -> [num_tokens, n_hash_cols, dim]
+         bf16, gathered from all TP shards."""
+@@ -1040,6 +1247,8 @@ class Engram(nn.Module):
+             layout.head_dim,
+             tuple(size for order in layout.primes[layer_hash_index] for size in order),
+             cpu_offload=engram_config.cpu_offload if engram_config else True,
++            layer_id=layout.layer_ids[layer_hash_index],
++            model_path=get_current_vllm_config().model_config.model,
+         )
+         n_hash_cols = (layout.max_ngram_size - 1) * layout.n_heads
+         self.wkv = ReplicatedLinear(
+@@ -1072,12 +1281,20 @@ class Engram(nn.Module):
+         # race on the shared staging buffer.
+         self._prefetch_stream = None
+         self._prefetch_pending = False
+-        if self.embed_tokens.cpu_offload and not get_current_vllm_config().parallel_config.enable_dbo:
++        if (
++            self.embed_tokens.cpu_offload
++            and not self.embed_tokens.mmap_enabled
++            and not get_current_vllm_config().parallel_config.enable_dbo
++        ):
+             self._prefetch_stream = torch.cuda.Stream(device=self.staged_rows.device)
+ 
+     def prepare_embeddings(self, hash_ids: torch.Tensor) -> None:
+         """Gather this layer's rows before decoder layers consume them."""
+         rows = self.staged_rows[: hash_ids.shape[0]]
++        if self.embed_tokens.mmap_enabled:
++            self._prefetch_pending = False
++            self.embed_tokens.prepare_mmap_lookup(hash_ids)
++            return
+         # A side-stream fork opened while capturing would be left unjoined
+         # when the capture segment ends, so gather on the main stream instead.
+         # The pending flag keeps prepare/embed paired: replay reads the same
+@@ -1104,10 +1321,14 @@ class Engram(nn.Module):
+         torch.cuda.current_stream().wait_stream(stream)
+ 
+     def _ready_rows(self, num_tokens: int) -> torch.Tensor:
++        rows = self.staged_rows[:num_tokens]
++        if self.embed_tokens.mmap_enabled:
++            self.embed_tokens.finish_mmap_lookup(rows)
++            return rows
+         if self._prefetch_pending and self._prefetch_stream is not None:
+             self._finish_prefetch(self._prefetch_stream)
+             self._prefetch_pending = False
+-        return self.staged_rows[:num_tokens]
++        return rows
+ 
+     def embed(self, hash_ids: torch.Tensor) -> torch.Tensor:
+         """Gather heads, returning only local tokens when SP is enabled."""
+diff --git a/vllm/models/deepseek_v4_1/common/engram_mmap.py b/vllm/models/deepseek_v4_1/common/engram_mmap.py
+new file mode 100644
+index 0000000..4b1bbde
+--- /dev/null
++++ b/vllm/models/deepseek_v4_1/common/engram_mmap.py
+@@ -0,0 +1,192 @@
++"""Read DeepSeek Engram safetensors rows through the Linux page cache."""
++
++from __future__ import annotations
++
++import json
++import logging
++import mmap
++import os
++import struct
++from concurrent.futures import ThreadPoolExecutor
++
++import numpy as np
++
++logger = logging.getLogger("vllm.engram_mmap")
++
++
++def _read_header(path: str) -> tuple[dict, int]:
++    with open(path, "rb") as f:
++        size_prefix = f.read(8)
++        if len(size_prefix) != 8:
++            raise ValueError(f"truncated safetensors header prefix: {path}")
++        header_size = struct.unpack("<Q", size_prefix)[0]
++        file_size = os.fstat(f.fileno()).st_size
++        if header_size > file_size - 8:
++            raise ValueError(f"safetensors header exceeds file size: {path}")
++        header_bytes = f.read(header_size)
++        if len(header_bytes) != header_size:
++            raise ValueError(f"truncated safetensors header: {path}")
++        header = json.loads(header_bytes)
++    if not isinstance(header, dict):
++        raise ValueError(f"safetensors header must be an object: {path}")
++    header.pop("__metadata__", None)
++    return header, 8 + header_size
++
++
++class MmapEngramTable:
++    """Map one rank-local row range without pinning the backing table."""
++
++    def __init__(
++        self,
++        model_path: str,
++        layer_id: int,
++        rows: int,
++        dim: int,
++        scale_cols: int,
++        start_row: int,
++        local_rows: int,
++        workers: int = 16,
++        chunk_rows: int = 1024,
++    ) -> None:
++        model_path = os.path.realpath(model_path)
++        if not os.path.isdir(model_path):
++            raise ValueError(f"Engram mmap requires a local model directory: {model_path}")
++        index_path = os.path.join(model_path, "model.safetensors.index.json")
++        with open(index_path, encoding="utf-8") as f:
++            weight_map = json.load(f)["weight_map"]
++
++        prefix = f"layers.{layer_id}.engram.embed"
++        names = {"weight": f"{prefix}.weight", "scale": f"{prefix}.scale"}
++        entries = {}
++        for kind, name in names.items():
++            filename = weight_map.get(name)
++            if filename is None:
++                raise KeyError(f"Engram mmap index is missing {name}")
++            path = os.path.realpath(os.path.join(model_path, filename))
++            if os.path.commonpath((model_path, path)) != model_path:
++                raise ValueError(f"Engram shard escapes model directory: {filename}")
++            header, data_start = _read_header(path)
++            meta = header.get(name)
++            if meta is None:
++                raise KeyError(f"Engram mmap shard header is missing {name}: {path}")
++            if not isinstance(meta, dict):
++                raise ValueError(f"invalid safetensors metadata for {name}: {path}")
++            entries[kind] = (path, data_start, meta)
++
++        weight_path, weight_data_start, weight_meta = entries["weight"]
++        scale_path, scale_data_start, scale_meta = entries["scale"]
++        if weight_meta["dtype"] != "F8_E4M3" or scale_meta["dtype"] != "F8_E8M0":
++            raise ValueError(
++                "Engram mmap expects F8_E4M3 weights and F8_E8M0 scales, got "
++                f"{weight_meta['dtype']} and {scale_meta['dtype']}"
++            )
++        if weight_meta["shape"] != [rows, dim]:
++            raise ValueError(
++                f"Engram layer {layer_id} weight shape {weight_meta['shape']} "
++                f"does not match {(rows, dim)}"
++            )
++        if scale_meta["shape"] != [rows, scale_cols]:
++            raise ValueError(
++                f"Engram layer {layer_id} scale shape {scale_meta['shape']} "
++                f"does not match {(rows, scale_cols)}"
++            )
++        if start_row < 0 or local_rows < 1 or start_row + local_rows > rows:
++            raise ValueError(
++                f"Engram layer {layer_id} local row range "
++                f"[{start_row}, {start_row + local_rows}) exceeds {rows}"
++            )
++
++        weight_begin, weight_end = weight_meta["data_offsets"]
++        scale_begin, scale_end = scale_meta["data_offsets"]
++        if weight_end - weight_begin != rows * dim or scale_end - scale_begin != rows * scale_cols:
++            raise ValueError(f"Engram layer {layer_id} has invalid safetensors offsets")
++        for path, data_start, begin, end in (
++            (weight_path, weight_data_start, weight_begin, weight_end),
++            (scale_path, scale_data_start, scale_begin, scale_end),
++        ):
++            file_size = os.path.getsize(path)
++            if begin < 0 or end < begin or data_start + end > file_size:
++                raise ValueError(f"Engram safetensors data range is invalid: {path}")
++
++        self.rows = local_rows
++        self.dim = dim
++        self.scale_cols = scale_cols
++        self.weight = np.memmap(
++            weight_path,
++            dtype=np.uint8,
++            mode="r",
++            offset=weight_data_start + weight_begin + start_row * dim,
++            shape=(local_rows, dim),
++        )
++        self.scales = np.memmap(
++            scale_path,
++            dtype=np.uint8,
++            mode="r",
++            offset=scale_data_start + scale_begin + start_row * scale_cols,
++            shape=(local_rows, scale_cols),
++        )
++        self._advise_random(self.weight)
++        self._advise_random(self.scales)
++        self.chunk_rows = max(1, int(chunk_rows))
++        self.pool = ThreadPoolExecutor(max_workers=max(1, int(workers)))
++        logger.info(
++            "Engram mmap: layer=%d rows=%d..%d dim=%d weight=%s scale=%s",
++            layer_id,
++            start_row,
++            start_row + local_rows,
++            dim,
++            weight_path,
++            scale_path,
++        )
++
++    @staticmethod
++    def _advise_random(array: np.memmap) -> None:
++        mapping = getattr(array, "_mmap", None)
++        if mapping is None or not hasattr(mmap, "MADV_RANDOM"):
++            return
++        try:
++            mapping.madvise(mmap.MADV_RANDOM)
++        except (OSError, ValueError):
++            logger.warning("Engram mmap MADV_RANDOM failed; keeping kernel defaults")
++
++    def gather_into(
++        self,
++        ids: np.ndarray,
++        weight_out: np.ndarray,
++        scale_out: np.ndarray,
++    ) -> None:
++        ids = np.ascontiguousarray(ids, dtype=np.int64).reshape(-1)
++        count = ids.size
++        if weight_out.shape[0] < count or weight_out.shape[1:] != (self.dim,):
++            raise ValueError(f"Engram weight output shape {weight_out.shape} for {count} rows")
++        if scale_out.shape[0] < count or scale_out.shape[1:] != (self.scale_cols,):
++            raise ValueError(f"Engram scale output shape {scale_out.shape} for {count} rows")
++        if count == 0:
++            return
++        if ids.min() < 0 or ids.max() >= self.rows:
++            raise IndexError(f"Engram local row ids exceed [0, {self.rows})")
++
++        unique, inverse = np.unique(ids, return_inverse=True)
++        unique_weight = np.empty((unique.size, self.dim), dtype=np.uint8)
++        unique_scale = np.empty((unique.size, self.scale_cols), dtype=np.uint8)
++        ranges = [
++            (start, min(start + self.chunk_rows, unique.size))
++            for start in range(0, unique.size, self.chunk_rows)
++        ]
++
++        def read_rows(bounds: tuple[int, int]) -> None:
++            start, end = bounds
++            rows = unique[start:end]
++            unique_weight[start:end] = self.weight[rows]
++            unique_scale[start:end] = self.scales[rows]
++
++        if len(ranges) <= 1:
++            read_rows(ranges[0])
++        else:
++            for _ in self.pool.map(read_rows, ranges):
++                pass
++        weight_out[:count] = unique_weight[inverse]
++        scale_out[:count] = unique_scale[inverse]
++
++
++__all__ = ["MmapEngramTable"]
+diff --git a/vllm/models/deepseek_v4_1/nvidia/model.py b/vllm/models/deepseek_v4_1/nvidia/model.py
+index 66940ea..27bd7db 100644
+--- a/vllm/models/deepseek_v4_1/nvidia/model.py
++++ b/vllm/models/deepseek_v4_1/nvidia/model.py
+@@ -992,6 +992,9 @@ class DeepseekV4Model(nn.Module, EagleModelMixin):
+                     loaded_params.add(name)
+                     continue
+ 
++        for name, param in params_dict.items():
++            if getattr(param, "engram_mmap_placeholder", False):
++                loaded_params.add(name)
+         return loaded_params
+ 
+     @staticmethod
