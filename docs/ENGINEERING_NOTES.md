@@ -3,10 +3,10 @@
 ## Deployment Baseline
 
 - Target: five CMP170HX GPUs with PP5/TP1 and decoder-layer partition `8,8,8,8,8`.
-- Keep model experts on GPU. The active r10 configuration uses no CPU expert offload.
+- Keep model experts on GPU. The active AIO deployment uses no CPU expert offload; r10 is the stopped rollback baseline. See [current deployment](CURRENT_DEPLOYMENT.md).
 - Use the original DeepSeek V4.1 Flash checkpoint and quantization. Do not transfer Qwen-specific quantization, hashing, or scheduling changes from the SSD reference project.
 - Runtime limits are configured for a 1M-token model length, 2048 batched tokens, and 8 sequences. These settings do not prove that a 1M-token request fits or completes.
-- The PP5 behavior is aligned to `344303947/dsv41-flash-pp5-170hx`, source revision `b3d5e18081285f75eb55e1e7a1c45e209d612e35`. The reference repository's separate eight-GPU TP8 example is not the deployment target.
+- Current AIO source is based on `344303947/dsv41-flash-pp5-170hx@d63af5a472dc76b12d7a73d50a5af142844c15d1`; historical r10 used `b3d5e18081285f75eb55e1e7a1c45e209d612e35`. The reference repository's separate eight-GPU TP8 example is not the deployment target.
 
 ## Main Scheduling Optimization: Lazy Receive
 
@@ -31,11 +31,13 @@ Scheduling changes should preserve output tokens and model scores, but this must
 ## Other Local Runtime Changes
 
 - **Shared token mapping:** r10 can reuse the GPU-computed token-to-request map across DeepSeek KV-group metadata copies. This is separate from lazy receive and is not established as the cause of the large 16.54-to-43.8 tok/s change.
-- **SSD Engram host breaks:** Engram FP8 weights and E8M0 scale tensors stay byte-for-byte in the original safetensors shards. Lookup uses SSD-backed mmap. Explicit layer IDs are required because layers 1 and 14 have matching shapes. The breakable CUDA Graph path places required host work outside captured segments while retaining graph execution around it.
-- **Container and host settings:** the service runs in an isolated Docker image. The launcher disables NCCL P2P and IB for this host, which has no useful peer-to-peer path in the tested setup. These are host-specific deployment settings, not portable defaults.
+- **SSD Engram host breaks:** Engram FP8 weights and E8M0 scale tensors stay byte-for-byte in the original safetensors shards. r10 used mmap lookup; current AIO uses O_DIRECT reads, Linux AIO and a bounded host row cache. Explicit layer IDs avoid confusing equal-shaped tables. Breakable CUDA Graphs keep required host work outside captured segments.
+- **Container and host settings:** current live settings are `NCCL_ALGO=Ring`, `NCCL_PROTO=Simple`, `NCCL_P2P_DISABLE=0`, `NCCL_IB_DISABLE=1`, `NCCL_P2P_LEVEL=SYS`. Earlier notes saying P2P is disabled do not describe this deployment. These settings alone do not establish which physical transfer path NCCL selects.
 
 ## Engram Storage Details
 
+- Current AIO keeps the IDs-to-pinned-buffer, C++ cache/read and side-stream copy/decode path asynchronous, but still performs CPU work. It is not direct SSD-to-GPU DMA. Both lazy receive and shared mapping remain enabled; there is no measured AIO lazy-off comparison.
+- The following mmap-specific notes describe r10 and its experiments, not the current row reader.
 - Resolve shards through the model index and validate paths against the model root, including checkpoint-cache symlinks.
 - Validate representative mmap rows against safetensors slices byte-for-byte before full service startup.
 - `chunk_rows=4` can improve parallelism for cold, small row batches, but may add overhead when pages are cached. Compare cold and warm page-cache conditions.

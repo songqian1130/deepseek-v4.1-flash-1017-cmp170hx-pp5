@@ -1,0 +1,526 @@
+diff --git a/vllm/config/engram.py b/vllm/config/engram.py
+index 6735b30..5a18015 100644
+--- a/vllm/config/engram.py
++++ b/vllm/config/engram.py
+@@ -43,7 +43,18 @@ class EngramConfig:
+     Defaults to False, or VLLM_PLE_CPU_OFFLOAD when set for compatibility.
+     An explicit value takes precedence over the legacy environment variable.
+     For DeepSeek V4.1 each rank offloads its assigned hash heads, so host
+-    table storage and lookup traffic scale with the heads assigned to it."""
++    table storage and lookup traffic scale with the heads assigned to it.
++    Not consulted when `storage` is 'ssd'."""
++
++    storage: str = "ram"
++    """Where the Engram tables physically live: 'ram' keeps them in pinned
++    host memory read over UVA; 'ssd' reads the original checkpoint slices
++    directly from disk with Linux O_DIRECT + AIO and a bounded hot row
++    cache. SSD storage requires TP1 and lazy safetensors loading."""
++
++    engram_cache_gib: float = Field(default=1.0, ge=0)
++    """Total hot row-cache budget in GiB across the model's Engram tables
++    for 'ssd' storage. Capped by the actual table sizes; 0 disables caching."""
+ 
+     embedding_across_dp: bool = False
+     """Shard embeddings across TP and all DP ranks when enabled.
+@@ -75,6 +86,10 @@ class EngramConfig:
+ 
+     def verify_parallel_config(self, parallel_config: "ParallelConfig") -> None:
+         """Reject unsupported embedding parallel topologies."""
++        if self.storage not in ("ram", "ssd"):
++            raise ValueError("EngramConfig.storage must be 'ram' or 'ssd'")
++        if self.storage == "ssd" and parallel_config.tensor_parallel_size != 1:
++            raise ValueError("Engram SSD storage requires tensor_parallel_size == 1")
+         if (
+             self.embedding_across_dp
+             and parallel_config.data_parallel_size > 1
+diff --git a/vllm/config/vllm.py b/vllm/config/vllm.py
+index cd04ac6..a65d074 100644
+--- a/vllm/config/vllm.py
++++ b/vllm/config/vllm.py
+@@ -1146,6 +1146,19 @@ class VllmConfig:
+             model_config = speculative_config.target_model_config
+         self.engram_config.verify_model_config(model_config)
+         self.engram_config.verify_parallel_config(self.parallel_config)
++        if self.engram_config.storage == "ssd":
++            if self.load_config.load_format not in ("auto", "safetensors"):
++                raise ValueError(
++                    "Engram SSD storage requires load_format auto/safetensors "
++                    f"got {self.load_config.load_format!r}."
++                )
++            if self.load_config.safetensors_load_strategy not in (None, "lazy"):
++                raise ValueError(
++                    "Engram SSD storage requires lazy (memory-mapped) "
++                    "safetensors loading; eager/prefetch would re-read the "
++                    "whole table into RAM."
++                )
++            self.load_config.safetensors_load_strategy = "lazy"
+         logger.info_once("Resolved Engram configuration: %s", str(self.engram_config))
+ 
+     def __post_init__(self):
+diff --git a/vllm/model_executor/models/qwen3_dspark.py b/vllm/model_executor/models/qwen3_dspark.py
+index 1ecdf5f..ff2413d 100644
+--- a/vllm/model_executor/models/qwen3_dspark.py
++++ b/vllm/model_executor/models/qwen3_dspark.py
+@@ -52,6 +52,27 @@ from .utils import (
+ logger = init_logger(__name__)
+ 
+ 
++def _map_cpu_parameters_to_uva(module: nn.Module) -> None:
++    """Expose CPU-created DSpark head weights through CUDA UVA."""
++    if not current_platform.is_cuda():
++        return
++    from vllm.utils.platform_utils import is_uva_available
++
++    if not is_uva_available():
++        raise RuntimeError("DSpark CPU head construction requires CUDA UVA")
++    from vllm.model_executor.offloader.base import pin_exact, should_pin_memory
++    from vllm.utils.torch_utils import get_accelerator_view_from_cpu_tensor
++
++    for parameter in module.parameters():
++        if parameter.device.type != "cpu":
++            continue
++        cpu_data = parameter.data
++        if should_pin_memory():
++            cpu_data = pin_exact(cpu_data)
++        parameter.data = get_accelerator_view_from_cpu_tensor(cpu_data)
++        parameter._vllm_is_uva_offloaded = True
++
++
+ def dspark_vocab_shard_enabled() -> bool:
+     """Whether the Markov head shards ``markov_w2`` over the TP group.
+ 
+@@ -104,15 +125,21 @@ class DSparkMarkovHead(nn.Module):
+         if shard_vocab is None:
+             shard_vocab = dspark_vocab_shard_enabled()
+         self.shard_vocab = shard_vocab
+-        self.markov_w1 = nn.Embedding(vocab_size, markov_rank)
+-        self.markov_w2 = ParallelLMHead(
+-            draft_vocab_size,
+-            markov_rank,
+-            bias=False,
+-            quant_config=quant_config,
+-            prefix=maybe_prefix(prefix, "markov_w2"),
+-            disable_tp=not shard_vocab,
+-        )
++        # This head is constructed after the target model and is not part of
++        # the decoder-layer offloader traversal. Keep its temporary storage on
++        # host memory, then expose it through UVA before weights are loaded.
++        with torch.device("cpu"):
++            self.markov_w1 = nn.Embedding(vocab_size, markov_rank)
++            self.markov_w2 = ParallelLMHead(
++                draft_vocab_size,
++                markov_rank,
++                bias=False,
++                quant_config=quant_config,
++                prefix=maybe_prefix(prefix, "markov_w2"),
++                disable_tp=not shard_vocab,
++            )
++        _map_cpu_parameters_to_uva(self.markov_w1)
++        _map_cpu_parameters_to_uva(self.markov_w2)
+         self.markov_w2._retain_weight_for_gather = retain_weight_for_gather
+         self.markov_w2.is_w4a16_nvfp4 = False
+ 
+diff --git a/vllm/models/deepseek_v4_1/common/engram.py b/vllm/models/deepseek_v4_1/common/engram.py
+index abc503f..4ef765f 100644
+--- a/vllm/models/deepseek_v4_1/common/engram.py
++++ b/vllm/models/deepseek_v4_1/common/engram.py
+@@ -58,6 +58,26 @@ from vllm.v1.attention.ops.fp8_sm80 import _decode_fp8_f32
+ 
+ logger = init_logger(__name__)
+ 
++GiB = 1024**3
++
++
++def plan_engram_cache(
++    cache_gib: float, num_embeddings: tuple[int, ...], head_dim: int
++) -> tuple[int, ...]:
++    """Split the host row-cache budget evenly, capped by FP8 table bytes.
++
++    Ported from the DeepSeek hybrid branch's cache planner: tables that use
++    less than their share return the remainder to the larger ones.
++    """
++    sizes = [rows * (head_dim + head_dim // 32) for rows in num_embeddings]
++    total = sum(sizes)
++    remaining = total if cache_gib >= total / GiB else int(cache_gib * GiB)
++    result = [0] * len(sizes)
++    for rank, index in enumerate(sorted(range(len(sizes)), key=sizes.__getitem__)):
++        result[index] = min(sizes[index], remaining // (len(sizes) - rank))
++        remaining -= result[index]
++    return tuple(result)
++
+ # Cache value for tokens that take no part in an n-gram (image spans).
+ DEAD_ID = -1
+ 
+@@ -755,13 +775,20 @@ class ParallelEngramEmbedding(nn.Module):
+         head_sizes: tuple[int, ...],
+         block_size: int = 32,
+         cpu_offload: bool = False,
++        storage: str = "ram",
++        max_tokens: int = 2048,
++        cache_bytes: int = 0,
+     ):
+         super().__init__()
+         tp_size = get_tensor_model_parallel_world_size()
+         tp_rank = get_tensor_model_parallel_rank()
+         assert head_sizes and all(size > 0 for size in head_sizes)
+         assert sum(head_sizes) <= num_embeddings
+-        if cpu_offload and not is_uva_available():
++        if storage not in ("ram", "ssd"):
++            raise ValueError("Engram storage must be 'ram' or 'ssd'")
++        if storage == "ssd" and tp_size != 1:
++            raise ValueError("Engram SSD currently requires TP1")
++        if cpu_offload and storage == "ram" and not is_uva_available():
+             raise RuntimeError("Engram CPU offload requires UVA support")
+         self.num_embeddings = num_embeddings
+         self.dim = dim
+@@ -775,6 +802,7 @@ class ParallelEngramEmbedding(nn.Module):
+         self.part_num_embeddings = self.vocab_end_idx - self.vocab_start_idx
+         self.tp_size = tp_size
+         self.cpu_offload = cpu_offload
++        self.ssd = None
+         self._views: tuple[torch.Tensor, torch.Tensor] | None = None
+         self._view_src: tuple[int, int] | None = None
+         self._num_sms = torch.cuda.get_device_properties(
+@@ -797,23 +825,57 @@ class ParallelEngramEmbedding(nn.Module):
+                 )
+             return torch.empty(shape, dtype=dtype, device="cpu", pin_memory=True)
+ 
++        if storage == "ssd":
++            from .engram_ssd import EngramSSD
++
++            self.ssd = EngramSSD(
++                dim,
++                block_size,
++                self.part_n_hash_cols,
++                max_tokens,
++                self.vocab_start_idx,
++                self.vocab_end_idx,
++                cache_bytes,
++            )
++            # Retain checkpoint names and shapes without allocating the table;
++            # the SSD weight loader records file slices instead of copying.
++            def _meta_alloc(
++                shape: tuple[int, ...], dtype: torch.dtype
++            ) -> torch.Tensor:
++                return torch.empty(shape, dtype=dtype, device="meta")
++
++            alloc = _meta_alloc
++        else:
++            alloc = _alloc
++
+         self.weight = nn.Parameter(
+-            _alloc((self.part_num_embeddings, dim), torch.float8_e4m3fn),
++            alloc((self.part_num_embeddings, dim), torch.float8_e4m3fn),
+             requires_grad=False,
+         )
+         self.weight_scale_inv = nn.Parameter(
+-            _alloc((self.part_num_embeddings, dim // block_size), torch.uint8),
++            alloc((self.part_num_embeddings, dim // block_size), torch.uint8),
+             requires_grad=False,
+         )
+         for param in (self.weight, self.weight_scale_inv):
+             set_weight_attrs(
+                 param,
+                 {
+-                    "weight_loader": _engram_head_shard_weight_loader,
++                    "weight_loader": (
++                        self.ssd.load if self.ssd else _engram_head_shard_weight_loader
++                    ),
+                     "engram_vocab_start": self.vocab_start_idx,
+                 },
+             )
+-        if cpu_offload:
++        if self.ssd is not None:
++            logger.info(
++                "Engram table stored on SSD via direct I/O: %d rows x %d, "
++                "%.2f GiB on disk per rank, row cache %.1f MiB",
++                self.part_num_embeddings,
++                dim,
++                self.part_num_embeddings * (dim + dim // block_size) / 1024**3,
++                cache_bytes / 1024**2,
++            )
++        elif cpu_offload:
+             logger.info(
+                 "Engram table offloaded to pinned host memory: %d rows x %d, "
+                 "%.2f GiB per rank",
+@@ -850,6 +912,9 @@ class ParallelEngramEmbedding(nn.Module):
+         rows = indices.shape[0] * self.part_n_hash_cols
+         if not rows:
+             return
++        if self.ssd is not None:
++            self.ssd.lookup(indices, out, background=background)
++            return
+         weight, scales = self._storage()
+         # The table dwarfs TLB reach, so a persistent grid near the SM count
+         # beats one program per row; halve it to leave SMs for the main stream.
+@@ -1033,12 +1098,20 @@ class Engram(nn.Module):
+         # Named ``embed_tokens`` so the checkpoint's ``engram.embed.weight``
+         # survives the mapper's ``embed.weight`` -> ``embed_tokens.weight``
+         # suffix rule.
+-        engram_config = get_current_vllm_config().engram_config
++        vllm_config = get_current_vllm_config()
++        engram_config = vllm_config.engram_config
+         self.embed_tokens = ParallelEngramEmbedding(
+             layout.num_embeddings[layer_hash_index],
+             layout.head_dim,
+             tuple(size for order in layout.primes[layer_hash_index] for size in order),
+             cpu_offload=engram_config.cpu_offload if engram_config else True,
++            storage=engram_config.storage if engram_config else "ram",
++            max_tokens=vllm_config.scheduler_config.max_num_batched_tokens,
++            cache_bytes=plan_engram_cache(
++                engram_config.engram_cache_gib if engram_config else 1,
++                layout.num_embeddings,
++                layout.head_dim,
++            )[layer_hash_index],
+         )
+         n_hash_cols = (layout.max_ngram_size - 1) * layout.n_heads
+         self.wkv = ReplicatedLinear(
+@@ -1068,11 +1141,21 @@ class Engram(nn.Module):
+         )
+ 
+     def prepare_embeddings(self, hash_ids: torch.Tensor) -> None:
+-        """Gather this layer's rows on the main stream before decoder layers."""
+-        self.embed_tokens.lookup(hash_ids, self.staged_rows[: hash_ids.shape[0]])
++        """Gather this layer's rows before the decoder layers consume them.
++
++        SSD reads are submitted on a side stream and overlap the preceding
++        local layers; the UVA path gathers on the main stream.
++        """
++        self.embed_tokens.lookup(
++            hash_ids,
++            self.staged_rows[: hash_ids.shape[0]],
++            background=self.embed_tokens.ssd is not None,
++        )
+ 
+     def embed(self, hash_ids: torch.Tensor) -> torch.Tensor:
+         """Gather heads, returning only local tokens when SP is enabled."""
++        if self.embed_tokens.ssd is not None:
++            self.embed_tokens.ssd.wait()
+         rows = self.staged_rows[: hash_ids.shape[0]]
+         if self.embed_tokens.tp_size == 1:
+             return rows
+diff --git a/vllm/models/deepseek_v4_1/nvidia/dspark.py b/vllm/models/deepseek_v4_1/nvidia/dspark.py
+index c03b176..361c0e6 100644
+--- a/vllm/models/deepseek_v4_1/nvidia/dspark.py
++++ b/vllm/models/deepseek_v4_1/nvidia/dspark.py
+@@ -42,6 +42,7 @@ from vllm.model_executor.model_loader.weight_utils import default_weight_loader
+ from vllm.model_executor.models.qwen3_dspark import (
+     DSparkConfidenceHead,
+     DSparkMarkovHead,
++    _map_cpu_parameters_to_uva,
+ )
+ from vllm.model_executor.models.utils import maybe_prefix
+ from vllm.models.common.ops.sequence_parallel import (
+@@ -320,11 +321,17 @@ class DSparkDeepseekV4ForCausalLM(nn.Module):
+             vllm_config=vllm_config, prefix=maybe_prefix(prefix, "model")
+         )
+         # Shared with the target (aliased by the speculator's load utility).
+-        self.lm_head = ParallelLMHead(
+-            self.config.vocab_size,
+-            self.config.hidden_size,
+-            prefix=maybe_prefix(prefix, "lm_head"),
+-        )
++        # The target model has already consumed this PP rank's GPU budget when
++        # the DSpark model is constructed. Keep the temporary standalone head
++        # on host memory and expose it through UVA before weight loading; the
++        # loader later replaces it with the target lm_head alias.
++        with torch.device("cpu"):
++            self.lm_head = ParallelLMHead(
++                self.config.vocab_size,
++                self.config.hidden_size,
++                prefix=maybe_prefix(prefix, "lm_head"),
++            )
++        _map_cpu_parameters_to_uva(self.lm_head)
+         self.logits_processor = LogitsProcessor(self.config.vocab_size)
+ 
+     # --- Hooks used by the speculator -------------------------------------
+diff --git a/vllm/v1/worker/gpu/spec_decode/dspark/utils.py b/vllm/v1/worker/gpu/spec_decode/dspark/utils.py
+index 5b13530..f5370e3 100644
+--- a/vllm/v1/worker/gpu/spec_decode/dspark/utils.py
++++ b/vllm/v1/worker/gpu/spec_decode/dspark/utils.py
+@@ -5,6 +5,7 @@ import torch.nn as nn
+ 
+ from vllm.config import ModelConfig, VllmConfig, replace
+ from vllm.logger import init_logger
++from vllm.model_executor.offloader import create_offloader, set_offloader
+ from vllm.v1.attention.backends.registry import AttentionBackendEnum
+ 
+ logger = init_logger(__name__)
+@@ -78,6 +79,13 @@ def load_dspark_model(target_model: nn.Module, vllm_config: VllmConfig) -> nn.Mo
+     # config is retained for DSpark's target-layer metadata, so we must override it.
+     draft_vllm_config.quant_config = get_draft_quant_config(vllm_config)
+ 
++    # The target model has already consumed the process-global offloader budget.
++    # DSpark is a second model owned by the last PP rank, so give its layer stack
++    # an independent budget before construction. Without this reset the draft
++    # layers are all materialized on the already-full GPU before their weights
++    # can be wrapped.
++    set_offloader(create_offloader(draft_vllm_config.offload_config))
++
+     with set_model_tag("dspark_head"):
+         draft_model = get_model(
+             vllm_config=draft_vllm_config, model_config=draft_model_config
+diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
+index 3aadd22..831a4f3 100644
+--- a/vllm/v1/worker/gpu_worker.py
++++ b/vllm/v1/worker/gpu_worker.py
+@@ -144,6 +144,9 @@ if TYPE_CHECKING:
+     from vllm.v1.worker.gpu_model_runner import GPUModelRunner
+ 
+ 
++PP5_DEFERRED_RECEIVE_COUNT = 0
++
++
+ class AsyncIntermediateTensors(IntermediateTensors):
+     """IntermediateTensors with lazy comm synchronization"""
+ 
+@@ -152,8 +155,10 @@ class AsyncIntermediateTensors(IntermediateTensors):
+         tensors: dict[str, torch.Tensor],
+         comm_handles: list[Handle] | None = None,
+         comm_postprocess: list[Callable[[], None]] | None = None,
++        comm_loader: Callable[[], Any] | None = None,
+     ) -> None:
+         super().__init__(tensors)
++        self._comm_loader = comm_loader
+         self._comm_handles = comm_handles
+         self._comm_postprocess = comm_postprocess
+         self._comm_waited = False
+@@ -161,6 +166,15 @@ class AsyncIntermediateTensors(IntermediateTensors):
+     def wait_for_comm(self) -> None:
+         if self._comm_waited:
+             return
++        if self._comm_loader is not None:
++            global PP5_DEFERRED_RECEIVE_COUNT
++            tensors, handles, postprocess = self._comm_loader()
++            assert tensors is not None
++            self.tensors = tensors
++            self._comm_handles = handles
++            self._comm_postprocess = postprocess
++            self._comm_loader = None
++            PP5_DEFERRED_RECEIVE_COUNT += 1
+         if self._comm_handles:
+             for handle in self._comm_handles:
+                 handle.wait()
+@@ -223,6 +237,13 @@ class Worker(WorkerBase):
+ 
+         # Device handles of the previous step's PP intermediate-tensor send.
+         self._pp_send_work: list[Handle] = []
++        self._pp5_defer_receive = os.environ.get("VLLM_PP5_LAZY_RECEIVE", "0") == "1"
++        if self._pp5_defer_receive:
++            assert not self.use_v2_model_runner
++            assert self.parallel_config.tensor_parallel_size == 1
++            assert self.parallel_config.pipeline_parallel_size == 5
++            assert self.model_config.hf_config.model_type == "deepseek_v41"
++            assert not self.parallel_config.enable_dbo
+ 
+         # Resolved lazily on first sleep/wake; persists worker-process state.
+         self._sleep_mode_backend: SleepModeBackend | None = None
+@@ -499,10 +520,54 @@ class Worker(WorkerBase):
+ 
+             self.model_runner = GPUModelRunnerV1(self.vllm_config, self.device)
+ 
++        # Initialize persistent PP communication resources before model and
++        # KV allocation. This makes first-use NCCL allocations deterministic
++        # and lets later memory profiling account for their steady-state cost.
++        self._prime_pp_communicators()
++
+         if self.rank == 0:
+             # If usage stat is enabled, collect relevant info.
+             report_usage_stats(self.vllm_config)
+ 
++    def _prime_pp_communicators(self) -> None:
++        """Initialize all lazy PP communicators before model/KV allocation."""
++        if getattr(self, "_pp_communicators_primed", False):
++            return
++        pp_group = get_pp_group()
++        if pp_group.world_size <= 1:
++            self._pp_communicators_primed = True
++            return
++        primer = torch.zeros(1, dtype=torch.int32, device=self.device)
++
++        # vLLM/PyNCCL point-to-point communicator.
++        if not pp_group.is_first_rank:
++            pp_group.recv(primer.shape, primer.dtype)
++        if not pp_group.is_last_rank:
++            pp_group.send(primer)
++        torch.accelerator.synchronize()
++
++        # torch ProcessGroupNCCL point-to-point edge communicators.
++        rank = pp_group.rank_in_group
++        if not pp_group.is_first_rank:
++            torch.distributed.recv(
++                primer, src=pp_group.ranks[rank - 1], group=pp_group.device_group
++            )
++        if not pp_group.is_last_rank:
++            torch.distributed.send(
++                primer, dst=pp_group.ranks[rank + 1], group=pp_group.device_group
++            )
++        torch.accelerator.synchronize()
++
++        # Sibling communicator used to broadcast sampled/draft tokens from
++        # the last PP rank back to the earlier ranks.
++        handler = getattr(self.model_runner, "pp_handler", None)
++        if handler is not None:
++            torch.distributed.broadcast(
++                primer, src=handler.last_rank, group=handler.broadcast_group
++            )
++            torch.accelerator.synchronize()
++        self._pp_communicators_primed = True
++
+     def handle_ft_command(self, ft_request):
+         assert self.worker_sentinel is not None
+         return self.worker_sentinel.handle_command(ft_request)
+@@ -821,14 +886,7 @@ class Worker(WorkerBase):
+         # and capture_model both drive decode steps under FULL cudagraph
+         # modes), communicator initialization invalidates the capture and the
+         # engine later dies on an async cudaErrorInvalidValue far from here.
+-        pp_group = get_pp_group()
+-        if pp_group.world_size > 1:
+-            primer = torch.zeros(1, dtype=torch.int32, device=self.device)
+-            if not pp_group.is_first_rank:
+-                pp_group.recv(primer.shape, primer.dtype)
+-            if not pp_group.is_last_rank:
+-                pp_group.send(primer)
+-            torch.accelerator.synchronize()
++        self._prime_pp_communicators()
+ 
+         # Warmup and tune the kernels used during model execution before
+         # cuda graph capture.
+@@ -1205,18 +1263,28 @@ class Worker(WorkerBase):
+             }
+ 
+         if forward_pass and not get_pp_group().is_first_rank:
+-            tensor_dict, comm_handles, comm_postprocess = (
+-                get_pp_group().irecv_tensor_dict(
++            def receive_intermediates():
++                return get_pp_group().irecv_tensor_dict(
+                     all_gather_group=get_tp_group(),
+                     all_gather_tensors=all_gather_tensors,
+                 )
+-            )
+-            assert tensor_dict is not None
+-            intermediate_tensors = AsyncIntermediateTensors(
+-                tensor_dict,
+-                comm_handles=comm_handles,
+-                comm_postprocess=comm_postprocess,
+-            )
++
++            if getattr(self, "_pp5_defer_receive", False) and not self.use_v2_model_runner:
++                # V1 prepares attention metadata before _preprocess consumes
++                # intermediates. Let all PP stages do this work concurrently.
++                # The original receiver, handles and postprocessing still run
++                # on this same thread/stream before tensors are accessed.
++                intermediate_tensors = AsyncIntermediateTensors(
++                    {}, comm_loader=receive_intermediates
++                )
++            else:
++                tensor_dict, comm_handles, comm_postprocess = receive_intermediates()
++                assert tensor_dict is not None
++                intermediate_tensors = AsyncIntermediateTensors(
++                    tensor_dict,
++                    comm_handles=comm_handles,
++                    comm_postprocess=comm_postprocess,
++                )
+ 
+         with self.annotate_profile(scheduler_output):
+             output = self.model_runner.execute_model(

@@ -4,14 +4,16 @@ This repository records the PP5 deployment, host-specific adaptations, benchmark
 
 ## Current Deployment
 
-The active baseline is **r10**:
+The active deployment is **AIO SSD Engram + lazy receive**, promoted on 2026-11-02. r10 is retained as a stopped rollback container. See [current deployment and operations](docs/CURRENT_DEPLOYMENT.md).
 
 - PP5/TP1 with layer partition `8,8,8,8,8`; all model experts remain on GPU.
 - Original DeepSeek V4.1 Flash checkpoint and quantization.
-- Engram tables are read from the checkpoint through SSD-backed mmap.
+- Engram rows are read from the original checkpoint through O_DIRECT + Linux AIO, with a CUDA side stream and an 8 GiB total host row cache. Model experts remain on GPU.
 - V1 model runner with `FULL_AND_PIECEWISE` CUDA graphs and the validated host breaks needed around SSD access.
 - Configured limits: 1M model length, 2048 batched tokens, 8 sequences, and GPU memory utilization 0.97. These are engine limits, not evidence that a full 1M-token request was tested.
 - PP scheduling includes the local lazy-receive optimization and shared token-to-request mapping. The lazy-receive measurements and correctness status are summarized in [Results](docs/RESULTS.md).
+- DSpark is disabled. Both `VLLM_PP5_LAZY_RECEIVE=1` and `VLLM_PP5_SHARED_MAPPING=1` remain enabled; AIO without lazy receive has not been validated.
+- Warm four-request aggregate throughput was 113.04–115.51 tok/s in the A-B-A comparison, versus r10's 105.24–107.61 tok/s. These are concurrent totals, not single-request speeds. Container CPU time per generated token fell about 22%. [Protocol, raw evidence and limits](docs/AIO_STABILITY_REPORT_20261102.md).
 
 **r23** is a stopped experimental Engram-ID staging candidate. Its warmed serial decode was slightly faster than r10, but its measured four-request per-request speed was lower. It was not promoted.
 
@@ -21,6 +23,9 @@ The largest measured PP scheduling change was delaying the start of intermediate
 
 ## Repository Guide
 
+- [docs/CURRENT_DEPLOYMENT.md](docs/CURRENT_DEPLOYMENT.md): authoritative startup entry, live parameters, rollback and source recovery.
+- `start-deepseek-official.sh`: current production entry; `start-deepseek-official-lan.sh` delegates to it. Historical experimental launchers are not current production defaults.
+- [docs/AIO_STABILITY_REPORT_20261102.md](docs/AIO_STABILITY_REPORT_20261102.md): AIO A-B-A comparison and production acceptance; raw reports in `benchmarks/2026-11/aio-stability/`.
 - [docs/ENGINEERING_NOTES.md](docs/ENGINEERING_NOTES.md): topology, local adaptations, design rationale, and operational constraints.
 - [docs/RESULTS.md](docs/RESULTS.md): measured performance, correctness evidence, and evidence gaps.
 - `benchmarks/2026-11/`: committed r10/r23 serial and concurrent results, plus quality and log-probability summaries.
@@ -42,6 +47,7 @@ For performance comparisons, keep prompts, generation limits, warmup state, conc
 
 ## References
 
+- Current PP5 source snapshot: `344303947/dsv41-flash-pp5-170hx@d63af5a472dc76b12d7a73d50a5af142844c15d1`; AIO reference: `aiultrayang/deepseek-v41-flash-cmp170hx@29b03af5eedfac9af12dfa14e8cfa7e2eafc852a`. Local changes are preserved in `aio-source-tracked.patch` and `aio-source-added/`.
 - PP5 source alignment: `344303947/dsv41-flash-pp5-170hx`, source revision `b3d5e18081285f75eb55e1e7a1c45e209d612e35`.
 - SSD access patterns: `AlexBrandes/cmp170hx-qwen38-flash-next`, source revision `c0db9613d146eda17338b84f2440ead5505f53c5`.
 - Qwen-specific hashing, scheduling, and quantization were not transplanted into the DeepSeek model path.

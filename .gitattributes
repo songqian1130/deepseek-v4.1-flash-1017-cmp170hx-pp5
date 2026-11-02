@@ -1,0 +1,2 @@
+# Unified diff context includes a required leading space on blank lines.
+aio-source-tracked.patch -whitespace

@@ -1,0 +1,13 @@
+2026-11-02T06:19:32.689520359Z (APIServer pid=7) INFO:     127.0.0.1:36804 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-02T06:19:32.697061653Z (APIServer pid=7) INFO:     127.0.0.1:36836 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-02T06:19:32.699512520Z (APIServer pid=7) INFO:     127.0.0.1:36820 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-02T06:19:32.705494969Z (APIServer pid=7) INFO:     127.0.0.1:36848 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-02T06:19:36.296258047Z (APIServer pid=7) INFO 11-02 06:19:36 [loggers.py:310] Engine 000: Avg prompt throughput: 15.2 tokens/s, Avg generation throughput: 63.7 tokens/s, Running: 4 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.3%, Prefix cache hit rate: 0.0%
+2026-11-02T06:19:36.700961993Z (Worker_PP0 pid=674) WARNING 11-02 06:19:36 [jit_monitor.py:141] Triton kernel JIT compilation during inference: _sparse_attn_decode_partial_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+2026-11-02T06:19:36.973208984Z (Worker_PP0 pid=674) WARNING 11-02 06:19:36 [jit_monitor.py:141] Triton kernel JIT compilation during inference: _sparse_attn_decode_reduce_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+2026-11-02T06:19:46.297298354Z (APIServer pid=7) INFO 11-02 06:19:46 [loggers.py:310] Engine 000: Avg prompt throughput: 0.0 tokens/s, Avg generation throughput: 0.0 tokens/s, Running: 4 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.3%, Prefix cache hit rate: 0.0%
+2026-11-02T06:19:56.298345376Z (APIServer pid=7) INFO 11-02 06:19:56 [loggers.py:310] Engine 000: Avg prompt throughput: 4.8 tokens/s, Avg generation throughput: 55.6 tokens/s, Running: 4 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.6%, Prefix cache hit rate: 0.0%
+2026-11-02T06:19:58.185281289Z (APIServer pid=7) INFO:     127.0.0.1:38124 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-02T06:19:58.188950463Z (APIServer pid=7) INFO:     127.0.0.1:38140 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-02T06:19:58.194061217Z (APIServer pid=7) INFO:     127.0.0.1:38132 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+2026-11-02T06:19:58.196405232Z (APIServer pid=7) INFO:     127.0.0.1:38150 - "POST /v1/chat/completions HTTP/1.1" 200 OK

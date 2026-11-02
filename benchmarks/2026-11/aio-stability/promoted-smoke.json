@@ -1,0 +1,64 @@
+{
+  "ok": true,
+  "base": "http://127.0.0.1:9010/v1",
+  "model": "deepseek-v4.1-flash-1017",
+  "cases_total": 3,
+  "cases_passed": 3,
+  "errors": [],
+  "results": [
+    {
+      "index": 1,
+      "prompt": "请用一句话回答：2 加 3 等于几？",
+      "text": "我们需要回答中文一句话。问题：2加3等于几？直接答5。需要一句话。用中文。可以“2 加 3 等于 5。” 确保一句话。\n2 加 3 等于 5。",
+      "usage": {
+        "prompt_tokens": 44,
+        "total_tokens": 95,
+        "completion_tokens": 51,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0,
+          "multimodal_tokens": null
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 39
+        }
+      }
+    },
+    {
+      "index": 2,
+      "prompt": "In one short sentence, what does a dictionary store?",
+      "text": "We need answer one short sentence. Need define dictionary stores key-value pairs. \"A dictionary stores a collection of key-value pairs, allowing values to be looked up by their unique keys.\" Short sentence.\nA dictionary stores a collection of key–value pairs that let you look up values by their keys.",
+      "usage": {
+        "prompt_tokens": 41,
+        "total_tokens": 103,
+        "completion_tokens": 62,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0,
+          "multimodal_tokens": null
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 40
+        }
+      }
+    },
+    {
+      "index": 3,
+      "prompt": "Write one Python expression that returns the square of x.",
+      "text": "Simple question. One Python expression that returns square of x.\n```python\nx ** 2\n```\n\nAlternatively, `x * x` or `pow(x, 2)` would also work.",
+      "usage": {
+        "prompt_tokens": 41,
+        "total_tokens": 83,
+        "completion_tokens": 42,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "created_cache_tokens": 0,
+          "multimodal_tokens": null
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 12
+        }
+      }
+    }
+  ]
+}

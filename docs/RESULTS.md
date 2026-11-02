@@ -1,5 +1,13 @@
 # Performance and Correctness Results
 
+## Current AIO Deployment (2026-11-02)
+
+The sequential r10 → AIO → r10 comparison measured four-request aggregate decode medians of 107.414 → 113.041 → 107.606 tok/s for repeated fixed-length prompts, and 105.244 → 115.505 → 105.821 tok/s for varied fixed-length prompts. Container CPU time per generated token fell about 22%. Production port 9010 then passed semantic smoke 3/3 and six formal concurrent rounds with median 113.533 tok/s (range 112.992–114.528).
+
+The candidate's 136 formal requests had no SSE chunk gap above one second (maximum 0.550 s), OOM or CPU throttling. The older severe stall coincided with inference-time Triton JIT; this supports a first-shape compilation explanation, not a universal stability guarantee. Keep compiler caches and distinguish warm throughput from the first request using a new shape.
+
+This compares whole deployments on different pinned source revisions, not a single-variable AIO backend substitution. AIO retains lazy receive and shared mapping; their necessity or benefit within AIO was not isolated. Numerical parity for lazy receive on/off remains unverified. See the [full protocol and limitations](AIO_STABILITY_REPORT_20261102.md) and committed raw data in `benchmarks/2026-11/aio-stability/`. The historical r10/r23 measurements below use their original workloads and should not be compared directly with this new protocol.
+
 ## Lazy-Receive A/B (Preliminary)
 
 An unsampled PP5 A/B run reported the following single-request decode rates:

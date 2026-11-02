@@ -1,0 +1,55 @@
+{
+  "n": 6,
+  "median": 113.53337265478197,
+  "mean": 113.68220177165699,
+  "min": 112.99150534100842,
+  "max": 114.52795270976128,
+  "cv_percent": 0.47088345779869323,
+  "p05": 112.99150534100842,
+  "e2e_weighted": 104.10583838366665,
+  "per_request_mean": 28.424410000787432,
+  "ttft_median_s": 0.655407870875024,
+  "cpu_ms_per_token": {
+    "usage_usec": 32.34504361979167,
+    "user_usec": 29.71271527777778,
+    "system_usec": 2.6323279079861113
+  },
+  "io": {
+    "259:0": {
+      "rbytes": 269844480,
+      "wbytes": 176128,
+      "rios": 63814,
+      "wios": 43,
+      "dbytes": 0,
+      "dios": 0
+    }
+  },
+  "psi_s": {
+    "cpu_pressure": {
+      "some": 0.017797,
+      "full": 0.017795
+    },
+    "io_pressure": {
+      "some": 0.0,
+      "full": 0.0
+    },
+    "memory_pressure": {
+      "some": 0.0,
+      "full": 0.0
+    }
+  },
+  "sse_gap_p99_s": 0.0689954349945765,
+  "max_sse_gap_s": 0.11031230100343237,
+  "rounds_gap_over1s": [],
+  "rounds_below80pctmedian": [],
+  "throttled_usec": 0,
+  "memory_events_delta": {
+    "low": 0,
+    "high": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_kill": 0,
+    "oom_group_kill": 0,
+    "sock_throttled": 0
+  }
+}

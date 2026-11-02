@@ -1,0 +1,677 @@
+{
+  "baseline-a1": {
+    "done": true,
+    "phases": {
+      "warmup": {
+        "n": 4,
+        "median": 97.85729508319943,
+        "mean": 98.48409687181373,
+        "min": 93.87918748086892,
+        "max": 104.34260983998719,
+        "cv_percent": 3.875613314671597,
+        "p05": 93.87918748086892,
+        "e2e_weighted": 89.81405485556421,
+        "per_request_mean": 25.691305590644852,
+        "ttft_median_s": 0.9707016818756529,
+        "cpu_ms_per_token": {
+          "usage_usec": 44.37208919270833,
+          "user_usec": 39.48598274739583,
+          "system_usec": 4.8861064453125005
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 639602688,
+            "wbytes": 8192,
+            "rios": 150742,
+            "wios": 2,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.031291,
+            "full": 0.031278
+          },
+          "io_pressure": {
+            "some": 0.448394,
+            "full": 0.447676
+          },
+          "memory_pressure": {
+            "some": 2.4e-05,
+            "full": 2.4e-05
+          }
+        },
+        "sse_gap_p99_s": 0.075200697996479,
+        "max_sse_gap_s": 0.7002622670042911,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      },
+      "repeated": {
+        "n": 12,
+        "median": 107.41369757941447,
+        "mean": 106.93931998969133,
+        "min": 97.17883831200348,
+        "max": 109.97022053206629,
+        "cv_percent": 2.959943691935268,
+        "p05": 106.31729731063079,
+        "e2e_weighted": 96.43051313491218,
+        "per_request_mean": 26.88146537057458,
+        "ttft_median_s": 0.836045548500806,
+        "cpu_ms_per_token": {
+          "usage_usec": 41.17636946614583,
+          "user_usec": 37.60652886284723,
+          "system_usec": 3.5698406032986107
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 438927360,
+            "wbytes": 0,
+            "rios": 106901,
+            "wios": 0,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.064646,
+            "full": 0.064329
+          },
+          "io_pressure": {
+            "some": 0.294546,
+            "full": 0.293797
+          },
+          "memory_pressure": {
+            "some": 0.0,
+            "full": 0.0
+          }
+        },
+        "sse_gap_p99_s": 0.07282324900006643,
+        "max_sse_gap_s": 0.6676989719999256,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      },
+      "varied": {
+        "n": 12,
+        "median": 105.24432144947671,
+        "mean": 104.71331480008081,
+        "min": 98.08291588709004,
+        "max": 110.96393367165642,
+        "cv_percent": 5.174768047484496,
+        "p05": 98.20370171991858,
+        "e2e_weighted": 94.50554432525274,
+        "per_request_mean": 27.087520481038222,
+        "ttft_median_s": 1.0349463727498005,
+        "cpu_ms_per_token": {
+          "usage_usec": 42.01118174913194,
+          "user_usec": 38.01122374131945,
+          "system_usec": 3.9999580078125
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 1116135424,
+            "wbytes": 3399680,
+            "rios": 253420,
+            "wios": 320,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.074517,
+            "full": 0.074471
+          },
+          "io_pressure": {
+            "some": 0.679512,
+            "full": 0.677942
+          },
+          "memory_pressure": {
+            "some": 0.0,
+            "full": 0.0
+          }
+        },
+        "sse_gap_p99_s": 0.0753254070004914,
+        "max_sse_gap_s": 0.8245063759968616,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      },
+      "natural": {
+        "n": 10,
+        "median": 92.64301471041495,
+        "mean": 93.06142481941829,
+        "min": 84.7128186000047,
+        "max": 102.5818956271198,
+        "cv_percent": 6.6305665506025155,
+        "p05": 84.7128186000047,
+        "e2e_weighted": 86.20244856398214,
+        "per_request_mean": 26.80900149377023,
+        "ttft_median_s": 0.9584172633749404,
+        "cpu_ms_per_token": {
+          "usage_usec": 45.75455068100358,
+          "user_usec": 41.88238078853047,
+          "system_usec": 3.8721700358422937
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 194592768,
+            "wbytes": 1736704,
+            "rios": 47323,
+            "wios": 234,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.048209,
+            "full": 0.048104
+          },
+          "io_pressure": {
+            "some": 0.098185,
+            "full": 0.09791
+          },
+          "memory_pressure": {
+            "some": 0.0,
+            "full": 0.0
+          }
+        },
+        "sse_gap_p99_s": 0.07223763599904487,
+        "max_sse_gap_s": 0.6720451779983705,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      }
+    }
+  },
+  "candidate-b": {
+    "done": true,
+    "phases": {
+      "warmup": {
+        "n": 4,
+        "median": 105.04103859306335,
+        "mean": 105.73615964693963,
+        "min": 100.837485382524,
+        "max": 112.02507601910779,
+        "cv_percent": 3.799707480752486,
+        "p05": 100.837485382524,
+        "e2e_weighted": 98.7435715945324,
+        "per_request_mean": 27.653859710855038,
+        "ttft_median_s": 0.8250336928767865,
+        "cpu_ms_per_token": {
+          "usage_usec": 33.88320540364583,
+          "user_usec": 30.613821940104163,
+          "system_usec": 3.2693834635416668
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 629153792,
+            "wbytes": 0,
+            "rios": 146579,
+            "wios": 0,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.015518,
+            "full": 0.015518
+          },
+          "io_pressure": {
+            "some": 0.00998,
+            "full": 0.009978
+          },
+          "memory_pressure": {
+            "some": 0.0,
+            "full": 0.0
+          }
+        },
+        "sse_gap_p99_s": 0.07101325999974506,
+        "max_sse_gap_s": 0.5587288090027869,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      },
+      "repeated": {
+        "n": 12,
+        "median": 113.04119667661224,
+        "mean": 113.06848434486947,
+        "min": 112.40345122107577,
+        "max": 113.78391128847214,
+        "cv_percent": 0.3993242788961924,
+        "p05": 112.43290178622692,
+        "e2e_weighted": 103.67498377079554,
+        "per_request_mean": 28.270936176025657,
+        "ttft_median_s": 0.6503076727503867,
+        "cpu_ms_per_token": {
+          "usage_usec": 32.03151746961806,
+          "user_usec": 29.331220811631947,
+          "system_usec": 2.7002968750000003
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 509423616,
+            "wbytes": 8192,
+            "rios": 120533,
+            "wios": 2,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.03536,
+            "full": 0.035348
+          },
+          "io_pressure": {
+            "some": 0.0,
+            "full": 0.0
+          },
+          "memory_pressure": {
+            "some": 0.0,
+            "full": 0.0
+          }
+        },
+        "sse_gap_p99_s": 0.06967251699825283,
+        "max_sse_gap_s": 0.111816518001433,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      },
+      "varied": {
+        "n": 12,
+        "median": 115.50524591383896,
+        "mean": 112.62470901163584,
+        "min": 105.51365380719632,
+        "max": 116.27544904297237,
+        "cv_percent": 3.8970684958590516,
+        "p05": 106.18305119009705,
+        "e2e_weighted": 102.94690366991308,
+        "per_request_mean": 28.596181795701817,
+        "ttft_median_s": 0.6783388991243555,
+        "cpu_ms_per_token": {
+          "usage_usec": 32.823706705729165,
+          "user_usec": 30.00484917534722,
+          "system_usec": 2.818857638888889
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 1229631488,
+            "wbytes": 266240,
+            "rios": 267779,
+            "wios": 40,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.051034,
+            "full": 0.051027
+          },
+          "io_pressure": {
+            "some": 0.033259,
+            "full": 0.033258
+          },
+          "memory_pressure": {
+            "some": 2e-06,
+            "full": 1e-06
+          }
+        },
+        "sse_gap_p99_s": 0.07154825700126821,
+        "max_sse_gap_s": 0.5501121089982917,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      },
+      "natural": {
+        "n": 10,
+        "median": 99.32486333826631,
+        "mean": 101.27688049871719,
+        "min": 98.90455899341262,
+        "max": 113.59488239498694,
+        "cv_percent": 4.488389473798556,
+        "p05": 98.90455899341262,
+        "e2e_weighted": 93.19964965699883,
+        "per_request_mean": 28.332394890959183,
+        "ttft_median_s": 0.6289733243756928,
+        "cpu_ms_per_token": {
+          "usage_usec": 36.11877603713374,
+          "user_usec": 33.231621119814335,
+          "system_usec": 2.8871550623730777
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 66031616,
+            "wbytes": 0,
+            "rios": 15002,
+            "wios": 0,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.02851,
+            "full": 0.028508
+          },
+          "io_pressure": {
+            "some": 0.000248,
+            "full": 0.000248
+          },
+          "memory_pressure": {
+            "some": 0.0,
+            "full": 1e-06
+          }
+        },
+        "sse_gap_p99_s": 0.06890621499769622,
+        "max_sse_gap_s": 0.07221232099982444,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      }
+    }
+  },
+  "baseline-a2": {
+    "done": true,
+    "phases": {
+      "warmup": {
+        "n": 4,
+        "median": 98.30693853135983,
+        "mean": 97.69380288642071,
+        "min": 94.54100917500682,
+        "max": 99.62032530795638,
+        "cv_percent": 1.9728899421506625,
+        "p05": 94.54100917500682,
+        "e2e_weighted": 89.92730727521509,
+        "per_request_mean": 25.772865153919142,
+        "ttft_median_s": 0.9638775338753476,
+        "cpu_ms_per_token": {
+          "usage_usec": 44.21647786458333,
+          "user_usec": 39.22342805989583,
+          "system_usec": 4.9930498046875
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 629731328,
+            "wbytes": 0,
+            "rios": 148154,
+            "wios": 0,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.029695,
+            "full": 0.029675
+          },
+          "io_pressure": {
+            "some": 0.388892,
+            "full": 0.388157
+          },
+          "memory_pressure": {
+            "some": 0.0,
+            "full": 0.0
+          }
+        },
+        "sse_gap_p99_s": 0.07528972899308428,
+        "max_sse_gap_s": 0.6942438289988786,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      },
+      "repeated": {
+        "n": 12,
+        "median": 107.60603647361722,
+        "mean": 105.91742284868253,
+        "min": 96.45634492254214,
+        "max": 110.04737551042362,
+        "cv_percent": 4.042237184612569,
+        "p05": 96.8938417248256,
+        "e2e_weighted": 95.7447724042222,
+        "per_request_mean": 26.70543163435785,
+        "ttft_median_s": 0.840517336625453,
+        "cpu_ms_per_token": {
+          "usage_usec": 41.49809201388889,
+          "user_usec": 37.71124338107639,
+          "system_usec": 3.7868486328125
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 549953536,
+            "wbytes": 8192,
+            "rios": 134076,
+            "wios": 2,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.065356,
+            "full": 0.065323
+          },
+          "io_pressure": {
+            "some": 0.381103,
+            "full": 0.380183
+          },
+          "memory_pressure": {
+            "some": 0.0,
+            "full": 0.0
+          }
+        },
+        "sse_gap_p99_s": 0.07400291500380263,
+        "max_sse_gap_s": 0.6624409130017739,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      },
+      "varied": {
+        "n": 12,
+        "median": 105.82102722396448,
+        "mean": 105.22232921180962,
+        "min": 97.83990449615303,
+        "max": 111.55697373643964,
+        "cv_percent": 5.1818204817001465,
+        "p05": 99.00638704859118,
+        "e2e_weighted": 94.67621260033044,
+        "per_request_mean": 27.104748745575066,
+        "ttft_median_s": 0.9834896090005714,
+        "cpu_ms_per_token": {
+          "usage_usec": 41.93989973958333,
+          "user_usec": 37.88259396701389,
+          "system_usec": 4.057305881076389
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 1146642432,
+            "wbytes": 2129920,
+            "rios": 260985,
+            "wios": 200,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.07364,
+            "full": 0.073596
+          },
+          "io_pressure": {
+            "some": 0.685742,
+            "full": 0.684332
+          },
+          "memory_pressure": {
+            "some": 0.0,
+            "full": 0.0
+          }
+        },
+        "sse_gap_p99_s": 0.07500511599937454,
+        "max_sse_gap_s": 0.8348467539981357,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      },
+      "natural": {
+        "n": 10,
+        "median": 93.99602394334454,
+        "mean": 94.19184472814662,
+        "min": 84.90177579332972,
+        "max": 102.96477865441724,
+        "cv_percent": 6.6172722100204595,
+        "p05": 84.90177579332972,
+        "e2e_weighted": 86.82893266654138,
+        "per_request_mean": 27.061583028123305,
+        "ttft_median_s": 0.8036560250011462,
+        "cpu_ms_per_token": {
+          "usage_usec": 45.69108136180034,
+          "user_usec": 41.8709013271783,
+          "system_usec": 3.8201797461050204
+        },
+        "io": {
+          "259:0": {
+            "rbytes": 159252480,
+            "wbytes": 860160,
+            "rios": 37780,
+            "wios": 80,
+            "dbytes": 0,
+            "dios": 0
+          }
+        },
+        "psi_s": {
+          "cpu_pressure": {
+            "some": 0.04673,
+            "full": 0.046383
+          },
+          "io_pressure": {
+            "some": 0.090848,
+            "full": 0.09054
+          },
+          "memory_pressure": {
+            "some": 0.0,
+            "full": 0.0
+          }
+        },
+        "sse_gap_p99_s": 0.07191754700033925,
+        "max_sse_gap_s": 0.669999572004599,
+        "rounds_gap_over1s": [],
+        "rounds_below80pctmedian": [],
+        "throttled_usec": 0,
+        "memory_events_delta": {
+          "low": 0,
+          "high": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0,
+          "oom_group_kill": 0,
+          "sock_throttled": 0
+        }
+      }
+    }
+  }
+}
